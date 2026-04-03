@@ -430,10 +430,10 @@ Built on top of GPT-2 SAE checkpoints (e.g. \texttt{best\_model\_fc\_sae\_m32\_l
 \begin{frame}{8d) Feature Analysis -- Activation Examples}
 \slideimg{ui_feature_examples.jpg}
 \begin{itemize}
-  \item Matched sentences displayed with \texttt{>>>token<<<} notation marking the activating token
-  \item Each example has a \textbf{prompt-aligned activation score} (e.g. 15.10, 14.58, ...)
-  \item Enables manual verification of the LLM-assigned label
-  \item Useful for catching mislabeled or polysemantic features
+  \item Matched sentences use \texttt{>>>token<<<} to mark the trigger token
+  \item Each example includes an activation score (e.g. 15.10, 14.58)
+  \item Supports manual verification of LLM-assigned labels
+  \item Helps catch mislabeled or polysemantic features
 \end{itemize}
 \end{frame}
 
