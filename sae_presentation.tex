@@ -1,0 +1,459 @@
+\documentclass[aspectratio=169]{beamer}
+
+\usetheme{metropolis}
+\setbeamertemplate{navigation symbols}{}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{array}
+
+\title{Sparse Autoencoders (SAE) for LLM Interpretability}
+\subtitle{From superposition to monosemantic features}
+\author{330 ML Lab}
+\date{}
+
+\newcommand{\slideimg}[1]{%
+  \begin{center}
+    \includegraphics[width=0.88\textwidth,height=0.58\textheight,keepaspectratio]{#1}
+  \end{center}
+}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Journey to SAE-based Model Interpretation}
+\begin{enumerate}
+  \item Understanding the superposition problem in LLMs
+  \item Collecting intuition on how SAE can help
+  \item Data collection and training of SAE variants
+  \item Architectural shift from vanilla SAE to TopK and FC\_SAE
+  \item Training statistics and health checks
+  \item Results on reconstruction quality and interpretability
+  \item Interpretation of learned features and failure cases
+  \item Inference UI walkthrough for practical feature analysis
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{1) Superposition in LLMs}
+\textbf{Core issue}
+\begin{itemize}
+  \item LLM activations encode more concepts than available neurons
+  \item A single neuron often responds to multiple unrelated patterns
+  \item This is observed as \textbf{polysemanticity}
+\end{itemize}
+
+\vspace{0.4em}
+\textbf{Consequence}
+\begin{itemize}
+  \item Neuron-level interpretation becomes unstable and ambiguous
+  \item Hard to assign one clean concept to one neuron
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Superposition Intuition}
+\textbf{Geometric view}
+\begin{itemize}
+  \item Suppose latent space has dimension $d$
+  \item Model needs to represent $m$ concepts with $m \gg d$
+  \item Concepts are packed as overlapping linear combinations
+\end{itemize}
+
+So observed activation vector is a mixture:
+\[
+z \approx \sum_{i=1}^{m} a_i f_i
+\]
+
+\begin{itemize}
+  \item $f_i$: underlying feature directions
+  \item $a_i$: feature strengths
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Why This Hurts Interpretability}
+\begin{itemize}
+  \item Raw neuron activations are not aligned with human concepts
+  \item A neuron can fire for different causes in different contexts
+  \item Causal interventions at neuron level can be noisy
+\end{itemize}
+
+\vspace{0.5em}
+\textbf{Goal of SAE-based MI}
+\begin{itemize}
+  \item Decompose dense/polysemantic representations
+  \item Recover sparse, more monosemantic feature activations
+\end{itemize}
+\end{frame}
+
+\begin{frame}{2) How Sparsity Solves Superposition}
+\textbf{Key idea: sparse dictionary coding}
+
+Learn:
+\begin{itemize}
+  \item an overcomplete feature dictionary ($m > d$)
+  \item sparse coefficients so only a few features are active per token
+\end{itemize}
+
+Then each input is reconstructed by a small active subset:
+\[
+z \rightarrow h(z) \rightarrow \hat{z}
+\]
+
+\begin{itemize}
+  \item Sparsity encourages feature specialization
+  \item Specialization improves interpretability
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Sparse Representation Principle}
+Given encoder output $h(z)$:
+\begin{itemize}
+  \item Most entries in $h(z)$ should be 0 (or near 0)
+  \item Only informative features should activate
+\end{itemize}
+
+This pushes the model away from:
+\begin{itemize}
+  \item ``everything somewhat active''
+\end{itemize}
+
+Toward:
+\begin{itemize}
+  \item ``few meaningful features strongly active''
+\end{itemize}
+
+Result: cleaner feature-to-concept mapping.
+\end{frame}
+
+\begin{frame}{3) SAE Intro: Architecture}
+Standard SAE components:
+\begin{enumerate}
+  \item \textbf{Encoder} maps LLM activation $z \in \mathbb{R}^d$ to sparse code $h(z) \in \mathbb{R}^m$
+  \item \textbf{Decoder} reconstructs $\hat{z}$ from sparse code
+\end{enumerate}
+
+Typical form (survey notation):
+\[
+\hat{z} = h(z) W_{dec} + b_{dec}
+\]
+
+\begin{itemize}
+  \item Overcomplete setting: $m \gg d$
+  \item Decoder columns often interpreted as learned features
+\end{itemize}
+\end{frame}
+
+\begin{frame}{SAE Loss (L1-Regularized Form)}
+From the survey's standard objective:
+\[
+L(z) = \|z - \hat{z}\|_2^2 + \alpha \|h(z)\|_1
+\]
+
+\begin{itemize}
+  \item Reconstruction term keeps information fidelity
+  \item $L_1$ term enforces sparse activations
+  \item $\alpha$ controls trade-off
+\end{itemize}
+
+\textbf{Trade-off}
+\begin{itemize}
+  \item High $\alpha$: more sparse, possibly worse reconstruction
+  \item Low $\alpha$: better reconstruction, less disentanglement
+\end{itemize}
+\end{frame}
+
+\begin{frame}{SAE Loss (KL Sparsity Form)}
+From Andrew Ng sparse AE notes:
+\[
+J_{sparse}(W,b) = J(W,b) + \beta \sum_{j=1}^{s_2} KL(\rho\,\|\,\hat{\rho}_j)
+\]
+
+Where:
+\begin{itemize}
+  \item $\rho$: target average activation (small, e.g., 0.05)
+  \item $\hat{\rho}_j$: empirical average activation of hidden unit $j$
+  \item $\beta$: sparsity penalty weight
+\end{itemize}
+
+Interpretation:
+\begin{itemize}
+  \item Explicitly forces each hidden unit to be rarely active on average
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Tuning Parameters (Practical)}
+\textbf{Core knobs}
+\begin{itemize}
+  \item Dictionary size $m$ (expansion factor)
+  \item Sparsity strength: $\alpha$ (L1) or $(\rho, \beta)$ (KL)
+  \item Learning rate and optimizer settings
+  \item Batch size and token sampling strategy
+\end{itemize}
+
+\textbf{Typical tuning workflow}
+\begin{enumerate}
+  \item Start with stable reconstruction
+  \item Increase sparsity gradually
+  \item Track dead features and feature usage spread
+  \item Select checkpoint with best interpretability/reconstruction balance
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{TopK SAE}
+TopK SAE enforces sparsity by selection, not by $L_1$ penalty.
+
+Encoder idea:
+\[
+\tilde{h}(z) = TopK\big(W_{enc}(z - b_{pre})\big)
+\]
+
+Training objective (survey form):
+\[
+L(z) = \|z - \hat{z}\|_2^2 + \alpha L_{aux}
+\]
+
+\begin{itemize}
+  \item Keep only top-$K$ activations per token
+  \item Avoids direct magnitude shrinkage from L1
+  \item Auxiliary loss helps stabilization / dead-latent reduction
+\end{itemize}
+\end{frame}
+
+\begin{frame}{FC\_SAE (Feature Choice SAE)}
+Feature Choice SAE changes sparsity allocation direction.
+
+Instead of:
+\begin{itemize}
+  \item fixed active features per token
+\end{itemize}
+
+It enforces:
+\begin{itemize}
+  \item each feature gets assigned to a controlled number of tokens
+\end{itemize}
+
+Survey statement (Ayonrinde, 2024):
+\[
+\sum_j S_{i,j} = m,\ \forall i
+\]
+
+\begin{itemize}
+  \item $S_{i,j}$ indicates whether feature $i$ is active for token $j$
+  \item Promotes uniform feature utilization
+  \item Targets dead-feature collapse directly
+\end{itemize}
+\end{frame}
+
+\begin{frame}{4) Architectural Shift: Why Move Beyond Vanilla SAE?}
+Reported issues in standard SAE variants:
+\begin{itemize}
+  \item Shrinkage bias from $L_1$ penalties
+  \item Dead latents (features that never activate)
+  \item Rigid sparsity allocation
+\end{itemize}
+
+New architectures aim to keep:
+\begin{itemize}
+  \item strong reconstruction
+  \item sparse features
+  \item healthier feature utilization
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Architectural Comparison (Quick)}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.2\textwidth} >{\raggedright\arraybackslash}p{0.3\textwidth} >{\raggedright\arraybackslash}p{0.22\textwidth} >{\raggedright\arraybackslash}p{0.2\textwidth}}
+\toprule
+Variant & Sparsity mechanism & Strength & Main concern \\
+\midrule
+Vanilla SAE & $L_1$ on activations & Simple and standard & Shrinkage bias \\
+TopK SAE & Hard top-$K$ per token & Direct control, cleaner sparsity & Choosing good $K$ \\
+FC\_SAE & Token allocation per feature & Better feature usage & More complex assignment dynamics \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\begin{frame}{5) Training Statistics -- Big Picture}
+\slideimg{stats_training_curve.png}
+\begin{itemize}
+  \item Training settles into a stable pattern instead of bouncing around wildly
+  \item Early epochs do most of the heavy lifting, later epochs are mostly polish
+  \item This is the point where we can start tuning for interpretability, not just reconstruction
+\end{itemize}
+\end{frame}
+
+\begin{frame}{5a) Training Health Check}
+\slideimg{stats_dead_feature_ratio.png}
+\begin{itemize}
+  \item Dead-feature ratio is the ``are we wasting neurons?'' dashboard
+  \item The trend suggests feature usage is becoming healthier over time
+  \item If this shot up too much, we'd dial back sparsity or adjust learning rate
+\end{itemize}
+\end{frame}
+
+\begin{frame}{5b) Feature Density Snapshot}
+\slideimg{stats_feature_density_hist.png}
+\begin{itemize}
+  \item Most activations stay near zero, which is exactly what sparse coding wants
+  \item A smaller set of features carries strong signal when needed
+  \item In plain terms: fewer features talk, but when they do, they say something useful
+\end{itemize}
+\end{frame}
+
+\begin{frame}{5c) Full Training Curves}
+\slideimg{training_history.png}
+\begin{itemize}
+  \item This gives the complete training-story timeline in one view
+  \item Curves are smooth enough to trust the run, not just one lucky batch
+  \item Good checkpoint zone: where reconstruction is stable and feature usage looks balanced
+\end{itemize}
+\end{frame}
+
+\begin{frame}{6) Results -- Reconstruction Quality}
+\slideimg{results_reconstruction_compare.png}
+\begin{itemize}
+  \item Reconstructed activations track the original signal closely
+  \item The model keeps key information while still enforcing sparsity
+  \item Nice practical takeaway: we are not paying a huge quality tax for interpretability
+\end{itemize}
+\end{frame}
+
+\begin{frame}{6a) Results -- Variant Comparison}
+\slideimg{results_variant_comparison.png}
+\begin{itemize}
+  \item Vanilla SAE, TopK SAE, and FC\_SAE each land at different trade-off points
+  \item TopK/FC-style designs look more consistent on feature usage behavior
+  \item If we care about cleaner features, these newer variants are worth the extra complexity
+\end{itemize}
+\end{frame}
+
+\begin{frame}{6b) Results -- Case-Level Example}
+\slideimg{results_case_study_tokens.png}
+\begin{itemize}
+  \item Token-level view makes differences easier to trust than aggregate metrics alone
+  \item We can see where sparsity helps and where reconstruction still misses details
+  \item This is the kind of slide that makes results feel concrete in discussion
+\end{itemize}
+\end{frame}
+
+\begin{frame}{7) Interpretation -- Feature Families}
+\slideimg{interpretation_feature_family_overview.png}
+\begin{itemize}
+  \item Features naturally cluster into themes (syntax, numbers, legal, emphasis, etc.)
+  \item This is where monosemantic behavior starts to become visible
+  \item Labeling gets much easier once these families emerge consistently
+\end{itemize}
+\end{frame}
+
+\begin{frame}{7a) Interpretation -- Failure Case}
+\slideimg{interpretation_polysemantic_failure.png}
+\begin{itemize}
+  \item Not every feature is clean; some still mix multiple concepts
+  \item These are useful warning signs, not bad news
+  \item They tell us where to retune sparsity or inspect data coverage
+\end{itemize}
+\end{frame}
+
+\begin{frame}{7b) Interpretation -- Activation Evidence}
+\slideimg{interpretation_activation_examples.png}
+\begin{itemize}
+  \item Matched examples help verify whether a label is actually grounded
+  \item If examples are coherent, confidence goes up quickly
+  \item If examples are messy, we treat the feature as ambiguous and keep investigating
+\end{itemize}
+\end{frame}
+
+\begin{frame}{8) Inference UI -- Overview}
+The inference UI (by ANTLR) has \textbf{three main tabs}:
+
+\vspace{0.4em}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.24\textwidth} >{\raggedright\arraybackslash}p{0.68\textwidth}}
+\toprule
+Tab & Purpose \\
+\midrule
+\textbf{SAE Analysis} & Input text -> see top-K activated features per token \\
+\textbf{Feature Map} & Search/label features across the full dataset \\
+\textbf{Feature Trace} & Trace a specific feature ID over any input text \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.6em}
+Built on top of GPT-2 SAE checkpoints (e.g. \texttt{best\_model\_fc\_sae\_m32\_layer10.pt})
+\end{frame}
+
+\begin{frame}{8a) SAE Analysis -- Token-level Feature Inspection}
+\slideimg{ui_token_view.jpg}
+\begin{itemize}
+  \item User pastes any input text and clicks \textbf{Analyze}
+  \item Hovering/tapping a token shows its \textbf{top-K activated features} on the right
+  \item Here, token \texttt{language} -> top feature \texttt{\#3000: Language Concept} (activation \textbf{13.846})
+  \item Remaining features (\#2071, \#3296, ...) show lower but non-trivial activations
+\end{itemize}
+\end{frame}
+
+\begin{frame}{8b) Feature Map -- Dataset Activation Search}
+\slideimg{ui_feature_map.jpg}
+\begin{itemize}
+  \item Given a \textbf{Feature ID}, scans the dataset (MLCommons/peoples\_speech) for activating sentences
+  \item Feature \#6068 labelled \emph{"Emphasis or extent"} -- found 4 matches in 200 sentences
+  \item Highlighted token per sentence shows \textbf{exactly which token triggered} the feature
+  \item Supports \textbf{Bulk Label} mode to label many features at once via LLM
+\end{itemize}
+\end{frame}
+
+\begin{frame}{8c) Feature Analysis -- LLM Auto-labeling}
+\slideimg{ui_sae_analysis.jpg}
+\begin{itemize}
+  \item For any feature, the system sends top-activating examples to an LLM for \textbf{automatic labeling}
+  \item Feature \#3425 -> labelled \emph{"Legal Court Context"} with confidence \textbf{HIGH}
+  \item Top token: \texttt{court} -- consistent across all matched sentences
+  \item Parameters: sentences to scan, examples sent to LLM, min activation threshold
+\end{itemize}
+\end{frame}
+
+\begin{frame}{8d) Feature Analysis -- Activation Examples}
+\slideimg{ui_feature_examples.jpg}
+\begin{itemize}
+  \item Matched sentences displayed with \texttt{>>>token<<<} notation marking the activating token
+  \item Each example has a \textbf{prompt-aligned activation score} (e.g. 15.10, 14.58, ...)
+  \item Enables manual verification of the LLM-assigned label
+  \item Useful for catching mislabeled or polysemantic features
+\end{itemize}
+\end{frame}
+
+\begin{frame}{8e) Feature Trace -- Single-feature Token Heatmap}
+\slideimg{ui_feature_trace.jpg}
+\begin{itemize}
+  \item Input text + Feature ID -> highlights \textbf{which tokens} activate that feature
+  \item Feature \#2873 (\emph{"Numerical Quantity"}) fires on token \texttt{hundred} in the sentence
+  \item Right panel: \textbf{Token Activation Map} with underline intensity as a visual cue
+  \item Stats shown: active tokens, token count, max activation, threshold
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Closing}
+\begin{itemize}
+  \item Superposition motivates feature-level decomposition
+  \item Sparsity makes decomposition practical and interpretable
+  \item SAE family evolves from L1-based to allocation-aware designs
+  \item TopK SAE and FC\_SAE reflect this architectural shift
+\end{itemize}
+\end{frame}
+
+\begin{frame}{References}
+\begin{itemize}
+  \item To be added
+\end{itemize}
+\end{frame}
+
+\begin{frame}[plain]
+\centering
+\Large Thank you.
+\end{frame}
+
+\end{document}

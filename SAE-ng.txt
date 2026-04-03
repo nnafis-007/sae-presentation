@@ -1,0 +1,1002 @@
+CS294A Lecture notes
+Andrew Ng
+
+Sparse autoencoder
+1
+
+Introduction
+
+Supervised learning is one of the most powerful tools of AI, and has led to
+automatic zip code recognition, speech recognition, self-driving cars, and a
+continually improving understanding of the human genome. Despite its significant successes, supervised learning today is still severely limited. Specifically, most applications of it still require that we manually specify the input
+features x given to the algorithm. Once a good feature representation is
+given, a supervised learning algorithm can do well. But in such domains as
+computer vision, audio processing, and natural language processing, there’re
+now hundreds or perhaps thousands of researchers who’ve spent years of their
+lives slowly and laboriously hand-engineering vision, audio or text features.
+While much of this feature-engineering work is extremely clever, one has to
+wonder if we can do better. Certainly this labor-intensive hand-engineering
+approach does not scale well to new problems; further, ideally we’d like to
+have algorithms that can automatically learn even better feature representations than the hand-engineered ones.
+These notes describe the sparse autoencoder learning algorithm, which
+is one approach to automatically learn features from unlabeled data. In some
+domains, such as computer vision, this approach is not by itself competitive
+with the best hand-engineered features, but the features it can learn do turn
+out to be useful for a range of problems (including ones in audio, text, etc).
+Further, there’re more sophisticated versions of the sparse autoencoder (not
+described in these notes, but that you’ll hear more about later in the class)
+that do surprisingly well, and in many cases are competitive with or superior
+to even the best hand-engineered representations.
+
+1
+
+These notes are organized as follows. We will first describe feedforward
+neural networks and the backpropagation algorithm for supervised learning.
+Then, we show how this is used to construct an autoencoder, which is an
+unsupervised learning algorithm. Finally, we build on this to derive a sparse
+autoencoder. Because these notes are fairly notation-heavy, the last page
+also contains a summary of the symbols used.
+
+2
+
+Neural networks
+
+Consider a supervised learning problem where we have access to labeled training examples (x(i) , y (i) ). Neural networks give a way of defining a complex,
+non-linear form of hypotheses hW,b (x), with parameters W, b that we can fit
+to our data.
+To describe neural networks, we will begin by describing the simplest
+possible neural network, one which comprises a single “neuron.” We will use
+the following diagram to denote a single neuron:
+
+This “neuron” is a computational unit that takes as inputPx1 , x2 , x3 (and
+a +1 intercept term), and outputs hW,b (x) = f (W T x) = f ( 3i=1 Wi xi + b),
+where f : R 7→ R is called the activation function. In these notes, we will
+choose f (·) to be the sigmoid function:
+f (z) =
+
+1
+.
+1 + exp(−z)
+
+Thus, our single neuron corresponds exactly to the input-output mapping
+defined by logistic regression.
+Although these notes will use the sigmoid function, it is worth noting that
+another common choice for f is the hyperbolic tangent, or tanh, function:
+ez − e−z
+,
+ez + e−z
+Here are plots of the sigmoid and tanh functions:
+f (z) = tanh(z) =
+
+2
+
+(1)
+
+The tanh(z) function is a rescaled version of the sigmoid, and its output
+range is [−1, 1] instead of [0, 1].
+Note that unlike CS221 and (parts of) CS229, we are not using the convention here of x0 = 1. Instead, the intercept term is handled separately by
+the parameter b.
+Finally, one identity that’ll be useful later: If f (z) = 1/(1 + exp(−z)) is
+the sigmoid function, then its derivative is given by f 0 (z) = f (z)(1 − f (z)).
+(If f is the tanh function, then its derivative is given by f 0 (z) = 1 − (f (z))2 .)
+You can derive this yourself using the definition of the sigmoid (or tanh)
+function.
+
+2.1
+
+Neural network formulation
+
+A neural network is put together by hooking together many of our simple
+“neurons,” so that the output of a neuron can be the input of another. For
+example, here is a small neural network:
+
+3
+
+In this figure, we have used circles to also denote the inputs to the network. The circles labeled “+1” are called bias units, and correspond to the
+intercept term. The leftmost layer of the network is called the input layer,
+and the rightmost layer the output layer (which, in this example, has only
+one node). The middle layer of nodes is called the hidden layer, because
+its values are not observed in the training set. We also say that our example
+neural network has 3 input units (not counting the bias unit), 3 hidden
+units, and 1 output unit.
+We will let nl denote the number of layers in our network; thus nl = 3
+in our example. We label layer l as Ll , so layer L1 is the input layer, and
+layer Lnl the output layer. Our neural network has parameters (W, b) =
+(l)
+(W (1) , b(1) , W (2) , b(2) ), where we write Wij to denote the parameter (or weight)
+associated with the connection between unit j in layer l, and unit i in layer
+(l)
+l+1. (Note the order of the indices.) Also, bi is the bias associated with unit
+i in layer l+1. Thus, in our example, we have W (1) ∈ R3×3 , and W (2) ∈ R1×3 .
+Note that bias units don’t have inputs or connections going into them, since
+they always output the value +1. We also let sl denote the number of nodes
+in layer l (not counting the bias unit).
+(l)
+We will write ai to denote the activation (meaning output value) of
+(1)
+unit i in layer l. For l = 1, we also use ai = xi to denote the i-th input.
+Given a fixed setting of the parameters W, b, our neural network defines a
+hypothesis hW,b (x) that outputs a real number. Specifically, the computation
+that this neural network represents is given by:
+(2)
+
+= f (W11 x1 + W12 x2 + W13 x3 + b1 )
+
+(2)
+
+= f (W21 x1 + W22 x2 + W23 x3 + b2 )
+
+a1
+
+a2
+
+(2)
+a3
+
+=
+
+hW,b (x) =
+
+(1)
+
+(1)
+
+(1)
+
+(1)
+
+(2)
+
+(1)
+
+(1)
+
+(1)
+
+(1)
+
+(3)
+
+(1)
+(1)
+(1)
+(1)
+f (W31 x1 + W32 x2 + W33 x3 + b3 )
+(3)
+(2) (2)
+(2) (2)
+(2) (2)
+(2)
+a1 = f (W11 a1 + W12 a2 + W13 a3 + b1 )
+
+(4)
+(5)
+
+(l)
+
+In the sequel, we also let zi denote the total weighted sum of inputs to unit
+P
+(2)
+(1)
+(1)
+i in layer l, including the bias term (e.g., zi = nj=1 Wij xj + bi ), so that
+(l)
+
+(l)
+
+ai = f (zi ).
+Note that this easily lends itself to a more compact notation. Specifically,
+if we extend the activation function f (·) to apply to vectors in an elementwise fashion (i.e., f ([z1 , z2 , z3 ]) = [f (z1 ), f (z2 ), f (z3 )]), then we can write
+
+4
+
+Equations (2-5) more compactly as:
+z (2)
+a(2)
+z (3)
+hW,b (x)
+
+=
+=
+=
+=
+
+W (1) x + b(1)
+f (z (2) )
+W (2) a(2) + b(2)
+a(3) = f (z (3) )
+
+More generally, recalling that we also use a(1) = x to also denote the values
+from the input layer, then given layer l’s activations a(l) , we can compute
+layer l + 1’s activations a(l+1) as:
+z (l+1) = W (l) a(l) + b(l)
+a(l+1) = f (z (l+1) )
+
+(6)
+(7)
+
+By organizing our parameters in matrices and using matrix-vector operations,
+we can take advantage of fast linear algebra routines to quickly perform
+calculations in our network.
+We have so far focused on one example neural network, but one can
+also build neural networks with other architectures (meaning patterns of
+connectivity between neurons), including ones with multiple hidden layers.
+The most common choice is a nl -layered network where layer 1 is the input
+layer, layer nl is the output layer, and each layer l is densely connected to
+layer l + 1. In this setting, to compute the output of the network, we can
+successively compute all the activations in layer L2 , then layer L3 , and so on,
+up to layer Lnl , using Equations (6-7). This is one example of a feedforward
+neural network, since the connectivity graph does not have any directed loops
+or cycles.
+Neural networks can also have multiple output units. For example, here
+is a network with two hidden layers layers L2 and L3 and two output units
+in layer L4 :
+
+5
+
+To train this network, we would need training examples (x(i) , y (i) ) where
+y ∈ R2 . This sort of network is useful if there’re multiple outputs that
+you’re interested in predicting. (For example, in a medical diagnosis application, the vector x might give the input features of a patient, and the different
+outputs yi ’s might indicate presence or absence of different diseases.)
+(i)
+
+2.2
+
+Backpropagation algorithm
+
+Suppose we have a fixed training set {(x(1) , y (1) ), . . . , (x(m) , y (m) )} of m training examples. We can train our neural network using batch gradient descent.
+In detail, for a single training example (x, y), we define the cost function with
+respect to that single example to be
+J(W, b; x, y) =
+
+1
+khW,b (x) − yk2 .
+2
+
+This is a (one-half) squared-error cost function. Given a training set of m
+examples, we then define the overall cost function to be
+"
+#
+sl+1 
+nl −1 X
+sl X
+m
+2
+1 X
+λX
+(l)
+(i) (i)
+Wji
+(8)
+J(W, b; x , y ) +
+J(W, b) =
+m i=1
+2 l=1 i=1 j=1
+"
+#
+sl+1 
+nl −1 X
+sl X
+m 
+2
+1 X 1
+λX
+2
+(l)
+(i)
+(i)
+=
+hW,b (x ) − y
++
+Wji
+m i=1 2
+2 l=1 i=1 j=1
+The first term in the definition of J(W, b) is an average sum-of-squares error
+term. The second term is a regularization term (also called a weight decay term) that tends to decrease the magnitude of the weights, and helps
+prevent overfitting.1 The weight decay parameter λ controls the relative importance of the two terms. Note also the slightly overloaded notation:
+J(W, b; x, y) is the squared error cost with respect to a single example; J(W, b)
+is the overall cost function, which includes the weight decay term.
+This cost function above is often used both for classification and for regression problems. For classification, we let y = 0 or 1 represent the two class
+labels (recall that the sigmoid activation function outputs values in [0, 1]; if
+(l)
+
+1
+
+Usually weight decay is not applied to the bias terms bi , as reflected in our definition
+for J(W, b). Applying weight decay to the bias units usually makes only a small different
+to the final network, however. If you took CS229, you may also recognize weight decay
+this as essentially a variant of the Bayesian regularization method you saw there, where we
+placed a Gaussian prior on the parameters and did MAP (instead of maximum likelihood)
+estimation.
+
+6
+
+we were using a tanh activation function, we would instead use -1 and +1
+to denote the labels). For regression problems, we first scale our outputs to
+ensure that they lie in the [0, 1] range (or if we were using a tanh activation
+function, then the [−1, 1] range).
+Our goal is to minimize J(W, b) as a function of W and b. To train
+(l)
+(l)
+our neural network, we will initialize each parameter Wij and each bi to
+a small random value near zero (say according to a N (0, 2 ) distribution
+for some small , say 0.01), and then apply an optimization algorithm such
+as batch gradient descent. Since J(W, b) is a non-convex function, gradient
+descent is susceptible to local optima; however, in practice gradient descent
+usually works fairly well. Finally, note that it is important to initialize the
+parameters randomly, rather than to all 0’s. If all the parameters start off at
+identical values, then all the hidden layer units will end up learning the same
+(1)
+function of the input (more formally, Wij will be the same for all values of
+(2)
+(2)
+(2)
+i, so that a1 = a2 = a3 = . . . for any input x). The random initialization
+serves the purpose of symmetry breaking.
+One iteration of gradient descent updates the parameters W, b as follows:
+(l)
+
+Wij
+
+(l)
+
+bi
+
+(l)
+
+:= Wij − α
+
+∂
+
+J(W, b)
+(l)
+∂Wij
+∂
+(l)
+:= bi − α (l) J(W, b)
+∂bi
+
+where α is the learning rate. The key step is computing the partial derivatives
+above. We will now describe the backpropagation algorithm, which gives
+an efficient way to compute these partial derivatives.
+We will first describe how backpropagation can be used to compute
+∂
+∂
+(l) J(W, b; x, y) and
+(l) J(W, b; x, y), the partial derivatives of the cost func∂Wij
+
+∂bi
+
+tion J(W, b; x, y) defined with respect to a single example (x, y). Once we can
+compute these, then by referring to Equation (8), we see that the derivative
+of the overall cost function J(W, b) can be computed as
+"
+#
+m
+∂
+1 X ∂
+(l)
+J(W, b) =
+J(W, b; x(i) , y (i) ) + λWij ,
+(l)
+(l)
+m i=1 ∂Wij
+∂Wij
+∂
+
+m
+
+1 X ∂
+J(W,
+b)
+=
+J(W, b; x(i) , y (i) ).
+(l)
+m i=1 ∂b(l)
+∂bi
+i
+The two lines above differ slightly because weight decay is applied to W but
+not b.
+7
+
+The intuition behind the backpropagation algorithm is as follows. Given
+a training example (x, y), we will first run a “forward pass” to compute
+all the activations throughout the network, including the output value of the
+hypothesis hW,b (x). Then, for each node i in layer l, we would like to compute
+(l)
+an “error term” δi that measures how much that node was “responsible”
+for any errors in our output. For an output node, we can directly measure
+the difference between the network’s activation and the true target value,
+(n )
+and use that to define δi l (where layer nl is the output layer). How about
+(l)
+hidden units? For those, we will compute δi based on a weighted average
+(l)
+of the error terms of the nodes that uses ai as an input. In detail, here is
+the backpropagation algorithm:
+1. Perform a feedforward pass, computing the activations for layers L2 ,
+L3 , and so on up to the output layer Lnl .
+2. For each output unit i in layer nl (the output layer), set
+(n )
+
+δi l =
+
+∂
+(n )
+∂zi l
+
+1
+(n )
+(n )
+ky − hW,b (x)k2 = −(yi − ai l ) · f 0 (zi l )
+2
+
+3. For l = nl − 1, nl − 2, nl − 3, . . . , 2
+For each node i in layer l, set
+(l)
+
+δi =
+
+sl+1
+X
+
+!
+(l)
+
+(l) (l+1)
+
+f 0 (zi )
+
+Wji δj
+
+j=1
+
+4. Compute the desired partial derivatives, which are given as:
+∂
+(l)
+∂Wij
+
+∂
+(l)
+∂bi
+
+(l) (l+1)
+
+J(W, b; x, y) = aj δi
+
+(l+1)
+
+J(W, b; x, y) = δi
+
+.
+
+Finally, we can also re-write the algorithm using matrix-vectorial notation. We will use “•” to denote the element-wise product operator (denoted
+“.*” in Matlab or Octave, and also called the Hadamard product), so that
+if a = b • c, then ai = bi ci . Similar to how we extended the definition of
+f (·) to apply element-wise to vectors, we also do the same for f 0 (·) (so that
+f 0 ([z1 , z2 , z3 ]) = [ ∂z∂ 1 f (z1 ), ∂z∂ 2 f (z2 ), ∂z∂ 3 f (z3 )]). The algorithm can then be
+written:
+8
+
+1. Perform a feedforward pass, computing the activations for layers L2 ,
+L3 , up to the output layer Lnl , using Equations (6-7).
+2. For the output layer (layer nl ), set
+δ (nl ) = −(y − a(nl ) ) • f 0 (z (n) )
+3. For l = nl − 1, nl − 2, nl − 3, . . . , 2
+Set
+
+δ (l) = (W (l) )T δ (l+1) • f 0 (z (l) )
+4. Compute the desired partial derivatives:
+∇W (l) J(W, b; x, y) = δ (l+1) (a(l) )T ,
+∇b(l) J(W, b; x, y) = δ (l+1) .
+(l)
+
+Implementation note: In steps 2 and 3 above, we need to compute f 0 (zi )
+for each value of i. Assuming f (z) is the sigmoid activation function, we
+(l)
+would already have ai stored away from the forward pass through the network. Thus, using the expression that we worked out earlier for f 0 (z), we
+(l)
+(l)
+(l)
+can compute this as f 0 (zi ) = ai (1 − ai ).
+Finally, we are ready to describe the full gradient descent algorithm. In
+the pseudo-code below, ∆W (l) is a matrix (of the same dimension as W (l) ),
+and ∆b(l) is a vector (of the same dimension as b(l) ). Note that in this
+notation, “∆W (l) ” is a matrix, and in particular it isn’t “∆ times W (l) .” We
+implement one iteration of batch gradient descent as follows:
+1. Set ∆W (l) := 0, ∆b(l) := 0 (matrix/vector of zeros) for all l.
+2. For i = 1 to m,
+2a. Use backpropagation to compute ∇W (l) J(W, b; x, y) and
+∇b(l) J(W, b; x, y).
+2b. Set ∆W (l) := ∆W (l) + ∇W (l) J(W, b; x, y).
+2c. Set ∆b(l) := ∆b(l) + ∇b(l) J(W, b; x, y).
+
+9
+
+3. Update the parameters:
+W
+
+(l)
+
+b(l)
+
+
+
+1
+(l)
+(l)
+:= W − α
+∆W
++ λW
+m
+
+
+1
+(l)
+(l)
+:= b − α
+∆b
+m
+(l)
+
+
+
+To train our neural network, we can now repeatedly take steps of gradient
+descent to reduce our cost function J(W, b).
+
+2.3
+
+Gradient checking and advanced optimization
+
+Backpropagation is a notoriously difficult algorithm to debug and get right,
+especially since many subtly buggy implementations of it—for example, one
+that has an off-by-one error in the indices and that thus only trains some of
+the layers of weights, or an implementation that omits the bias term—will
+manage to learn something that can look surprisingly reasonable (while performing less well than a correct implementation). Thus, even with a buggy
+implementation, it may not at all be apparent that anything is amiss. In
+this section, we describe a method for numerically checking the derivatives
+computed by your code to make sure that your implementation is correct.
+Carrying out the derivative checking procedure described here will significantly increase your confidence in the correctness of your code.
+Suppose we want to minimize J(θ) as a function of θ. For this example,
+suppose J : R 7→ R, so that θ ∈ R. In this 1-dimensional case, one iteration
+of gradient descent is given by
+θ := θ − α
+
+d
+J(θ).
+dθ
+
+Suppose also that we have implemented some function g(θ) that purportedly
+d
+computes dθ
+J(θ), so that we implement gradient descent using the update
+θ := θ − αg(θ). How can we check if our implementation of g is correct?
+Recall the mathematical definition of the derivative as
+d
+J(θ + ) − J(θ − )
+J(θ) = lim
+.
+→0
+dθ
+2
+Thus, at any specific value of θ, we can numerically approximate the derivative as follows:
+J(θ + EPSILON) − J(θ − EPSILON)
+2 × EPSILON
+10
+
+In practice, we set EPSILON to a small constant, say around 10−4 . (There’s
+a large range of values of EPSILON that should work well, but we don’t set
+EPSILON to be “extremely” small, say 10−20 , as that would lead to numerical
+roundoff errors.)
+d
+Thus, given a function g(θ) that is supposedly computing dθ
+J(θ), we can
+now numerically verify its correctness by checking that
+g(θ) ≈
+
+J(θ + EPSILON) − J(θ − EPSILON)
+.
+2 × EPSILON
+
+The degree to which these two values should approximate each other will
+depend on the details of J. But assuming EPSILON = 10−4 , you’ll usually
+find that the left- and right-hand sides of the above will agree to at least 4
+significant digits (and often many more).
+Now, consider the case where θ ∈ Rn is a vector rather than a single
+real number (so that we have n parameters that we want to learn), and
+J : Rn 7→ R. In our neural network example we used “J(W, b),” but one
+can imagine “unrolling” the parameters W, b into a long vector θ. We now
+generalize our derivative checking procedure to the case where θ may be a
+vector.
+Suppose we have a function gi (θ) that purportedly computes ∂θ∂ i J(θ);
+we’d like to check if gi is outputting correct derivative values. Let θ(i+) =
+θ + EPSILON × ~ei , where
+ 
+0
+ 0 
+ . 
+ . 
+ . 
+~ei =  
+ 1 
+ . 
+ .. 
+0
+is the i-th basis vector (a vector of the same dimension as θ, with a “1”
+in the i-th position and “0”s everywhere else). So, θ(i+) is the same as
+θ, except its i-th element has been incremented by EPSILON. Similarly, let
+θ(i−) = θ − EPSILON × ~ei be the corresponding vector with the i-th element
+decreased by EPSILON. We can now numerically verify gi (θ)’s correctness by
+checking, for each i, that:
+gi (θ) ≈
+
+J(θ(i+) ) − J(θ(i−) )
+.
+2 × EPSILON
+
+When implementing backpropagation to train a neural network, in a cor11
+
+rect implementation we will have that
+
+
+1
+(l)
++ λW (l)
+∆W
+∇W (l) J(W, b) =
+m
+1
+∇b(l) J(W, b) =
+∆b(l) .
+m
+This result shows that the final block of psuedo-code in Section 2.2 is indeed
+implementing gradient descent. To make sure your implementation of gradient descent is correct, it is usually very helpful to use the method described
+above to numerically compute the derivatives
+of J(W, b), and thereby verify
+
+that your computations of m1 ∆W (l) + λW and m1 ∆b(l) are indeed giving the
+derivatives you want.
+Finally, so far our discussion has centered on using gradient descent to
+minimize J(θ). If you have implemented a function that computes J(θ) and
+∇θ J(θ), it turns out there are more sophisticated algorithms than gradient
+descent for trying to minimize J(θ). For example, one can envision an algorithm that uses gradient descent, but automatically tunes the learning rate
+α so as to try to use a step-size that causes θ to approach a local optimum
+as quickly as possible. There are other algorithms that are even more sophisticated than this; for example, there are algorithms that try to find an
+approximation to the Hessian matrix, so that it can take more rapid steps
+towards a local optimum (similar to Newton’s method). A full discussion of
+these algorithms is beyond the scope of these notes, but one example is the
+L-BFGS algorithm. (Another example is conjugate gradient.) You will
+use one of these algorithms in the programming exercise. The main thing you
+need to provide to these advanced optimization algorithms is that for any θ,
+you have to be able to compute J(θ) and ∇θ J(θ). These optimization algorithms will then do their own internal tuning of the learning rate/step-size α
+(and compute its own approximation to the Hessian, etc.) to automatically
+search for a value of θ that minimizes J(θ). Algorithms such as L-BFGS and
+conjugate gradient can often be much faster than gradient descent.
+
+3
+
+Autoencoders and sparsity
+
+So far, we have described the application of neural networks to supervised
+learning, in which we are have labeled training examples. Now suppose we
+have only unlabeled training examples set {x(1) , x(2) , x(3) , . . .}, where x(i) ∈
+Rn . An autoencoder neural network is an unsupervised learning algorithm
+that applies backpropagation, setting the target values to be equal to the
+inputs. I.e., it uses y (i) = x(i) .
+12
+
+Here is an autoencoder:
+
+The autoencoder tries to learn a function hW,b (x) ≈ x. In other words, it
+is trying to learn an approximation to the identity function, so as to output
+x̂ that is similar to x. The identity function seems a particularly trivial
+function to be trying to learn; but by placing constraints on the network,
+such as by limiting the number of hidden units, we can discover interesting
+structure about the data. As a concrete example, suppose the inputs x are
+the pixel intensity values from a 10 × 10 image (100 pixels) so n = 100,
+and there are s2 = 50 hidden units in layer L2 . Note that we also have
+y ∈ R100 . Since there are only 50 hidden units, the network is forced to
+learn a compressed representation of the input. I.e., given only the vector of
+hidden unit activations a(2) ∈ R50 , it must try to reconstruct the 100-pixel
+input x. If the input were completely random—say, each xi comes from an
+IID Gaussian independent of the other features—then this compression task
+would be very difficult. But if there is structure in the data, for example, if
+some of the input features are correlated, then this algorithm will be able to
+discover some of those correlations.2
+2
+
+In fact, this simple autoencoder often ends up learning a low-dimensional representation very similar to PCA’s.
+
+13
+
+Our argument above relied on the number of hidden units s2 being small.
+But even when the number of hidden units is large (perhaps even greater
+than the number of input pixels), we can still discover interesting structure,
+by imposing other constraints on the network. In particular, if we impose
+a sparsity constraint on the hidden units, then the autoencoder will still
+discover interesting structure in the data, even if the number of hidden units
+is large.
+Informally, we will think of a neuron as being “active” (or as “firing”)
+if its output value is close to 1, or as being “inactive” if its output value is
+close to 0. We would like to constrain the neurons to be inactive most of the
+time.3
+(2)
+Recall that aj denotes the activation of hidden unit j in the autoencoder.
+However, this notation doesn’t make explicit what was the input x that led
+(2)
+to that activation. Thus, we will write aj (x) to denote the activation of this
+hidden unit when the network is given a specific input x. Further, let
+m
+1 X h (2) (i) i
+a (x )
+ρ̂j =
+m i=1 j
+
+be the average activation of hidden unit j (averaged over the training set).
+We would like to (approximately) enforce the constraint
+ρ̂j = ρ,
+where ρ is a sparsity parameter, typically a small value close to zero (say
+ρ = 0.05). In other words, we would like the average activation of each
+hidden neuron j to be close to 0.05 (say). To satisfy this constraint, the
+hidden unit’s activations must mostly be near 0.
+To achieve this, we will add an extra penalty term to our optimization
+objective that penalizes ρ̂j deviating significantly from ρ. Many choices of
+the penalty term will give reasonable results. We will choose the following:
+s2
+X
+j=1
+
+ρ log
+
+1−ρ
+ρ
++ (1 − ρ) log
+.
+ρ̂j
+1 − ρ̂j
+
+Here, s2 is the number of neurons in the hidden layer, and the index j is
+summing over the hidden units in our network. If you are familiar with the
+3
+
+This discussion assumes a sigmoid activation function. If you are using a tanh activation function, then we think of a neuron as being inactive when it outputs values close to
+-1.
+
+14
+
+concept of KL divergence, this penalty term is based on it, and can also be
+written
+s2
+X
+KL(ρ||ρ̂j ),
+j=1
+1−ρ
+where KL(ρ||ρ̂j ) = ρ log ρ̂ρj + (1 − ρ) log 1−ρ̂
+is the Kullback-Leibler (KL)
+j
+divergence between a Bernoulli random variable with mean ρ and a Bernoulli
+random variable with mean ρ̂j . KL-divergence is a standard function for
+measuring how different two different distributions are. (If you’ve not seen
+KL-divergence before, don’t worry about it; everything you need to know
+about it is contained in these notes.)
+This penalty function has the property that KL(ρ||ρ̂j ) = 0 if ρ̂j = ρ, and
+otherwise it increases monotonically as ρ̂j diverges from ρ. For example, in
+the figure below, we have set ρ = 0.2, and plotted KL(ρ||ρ̂j ) for a range of
+values of ρ̂j :
+
+We see that the KL-divergence reaches its minimum of 0 at ρ̂j = ρ, and blows
+up (it actually approaches ∞) as ρ̂j approaches 0 or 1. Thus, minimizing
+this penalty term has the effect of causing ρ̂j to be close to ρ.
+Our overall cost function is now
+Jsparse (W, b) = J(W, b) + β
+
+s2
+X
+
+KL(ρ||ρ̂j ),
+
+j=1
+
+where J(W, b) is as defined previously, and β controls the weight of the
+sparsity penalty term. The term ρ̂j (implicitly) depends on W, b also, because
+it is the average activation of hidden unit j, and the activation of a hidden
+unit depends on the parameters W, b.
+To incorporate the KL-divergence term into your derivative calculation,
+there is a simple-to-implement trick involving only a small change to your
+15
+
+code. Specifically, where previously for the second layer (l = 2), during
+backpropagation you would have computed
+!
+s3
+X
+(2)
+(3) (3)
+(2)
+δi =
+Wji δj
+f 0 (zi ),
+j=1
+
+now instead compute
+(2)
+δi =
+
+s3
+X
+
+!
+(3) (3)
+Wji δj
+
+(2)
+f (zi ) + β
+0
+
+j=1
+
+
+
+ρ
+1−ρ
+.
+− +
+ρ̂i 1 − ρ̂i
+
+One subtlety is that you’ll need to know ρ̂i to compute this term. Thus,
+you’ll need to compute a forward pass on all the training examples first
+to compute the average activations on the training set, before computing
+backpropagation on any example. If your training set is small enough to fit
+comfortably in computer memory (this will be the case for the programming
+assignment), you can compute forward passes on all your examples and keep
+the resulting activations in memory and compute the ρ̂i s. Then you can
+use your precomputed activations to perform backpropagation on all your
+examples. If your data is too large to fit in memory, you may have to scan
+through your examples computing a forward pass on each to accumulate (sum
+up) the activations and compute ρ̂i (discarding the result of each forward
+(2)
+pass after you have taken its activations ai into account for computing ρ̂i ).
+Then after having computed ρ̂i , you’d have to redo the forward pass for each
+example so that you can do backpropagation on that example. In this latter
+case, you would end up computing a forward pass twice on each example in
+your training set, making it computationally less efficient.
+The full derivation showing that the algorithm above results in gradient
+descent is beyond the scope of these notes. But if you implement the autoencoder using backpropagation modified this way, you will be performing
+gradient descent exactly on the objective Jsparse (W, b). Using the derivative
+checking method, you will be able to verify this for yourself as well.
+
+4
+
+Visualization
+
+Having trained a (sparse) autoencoder, we would now like to visualize the
+function learned by the algorithm, to try to understand what it has learned.
+Consider the case of training an autoencoder on 10 × 10 images, so that
+
+16
+
+n = 100. Each hidden unit i computes a function of the input:
+!
+100
+X
+(2)
+(1)
+(1)
+ai = f
+Wij xj + bi
+.
+j=1
+
+We will visualize the function computed by hidden unit i—which depends on
+(1)
+the parameters Wij (ignoring the bias term for now) using a 2D image. In
+(1)
+particular, we think of ai as some non-linear feature of the input x. We ask:
+(1)
+What input image x would cause ai to be maximally activated? For this
+question to have a non-trivial answer, we must impose some constraints
+P100 2 on
+2
+x. If we suppose that the input is norm constrained by ||x|| = i=1 xi ≤ 1,
+then one can show (try doing this yourself) that the input which maximally
+activates hidden unit i is given by setting pixel xj (for all 100 pixels, j =
+1, . . . , 100) to
+(1)
+Wij
+.
+xj = qP
+(1) 2
+100
+)
+(W
+ij
+j=1
+By displaying the image formed by these pixel intensity values, we can begin
+to understand what feature hidden unit i is looking for.
+If we have an autoencoder with 100 hidden units (say), then we our
+visualization will have 100 such images—one per hidden unit. By examining
+these 100 images, we can try to understand what the ensemble of hidden
+units is learning.
+When we do this for a sparse autoencoder (trained with 100 hidden units
+on 10x10 pixel inputs4 ) we get the following result:
+4
+
+The results below were obtained by training on whitened natural images. Whitening
+is a preprocessing step which removes redundancy in the input, by causing adjacent pixels
+to become less correlated.
+
+17
+
+Each square in the figure above shows the (norm bounded) input image x
+that maximally actives one of 100 hidden units. We see that the different hidden units have learned to detect edges at different positions and orientations
+in the image.
+These features are, not surprisingly, useful for such tasks as object recognition and other vision tasks. When applied to other input domains (such
+as audio), this algorithm also learns useful representations/features for those
+domains too.
+
+18
+
+5
+
+Summary of notation
+
+Input features for a training example, x ∈ Rn .
+Output/target values. Here, y can be vector valued. In the case
+of an autoencoder, y = x.
+(i) (i)
+(x , y ) The i-th training example
+hW,b (x)
+Output of our hypothesis on input x, using parameters W, b.
+This should be a vector of the same dimension as the target
+value y.
+(l)
+The parameter associated with the connection between unit j
+Wij
+in layer l, and unit i in layer l + 1.
+(l)
+The bias term associated with unit i in layer l + 1. Can also
+bi
+be thought of as the parameter associated with the connection
+between the bias unit in layer l and unit i in layer l + 1.
+θ
+Our parameter vector. It is useful to think of this as the result
+of taking the parameters W, b and “unrolling” them into a long
+column vector.
+(l)
+Activation (output) of unit i in layer l of the network. In addiai
+(1)
+tion, since layer L1 is the input layer, we also have ai = xi .
+f (·)
+The activation function. Throughout these notes, we used
+f (z) = tanh(z).
+(l)
+(l)
+Total weighted sum of inputs to unit i in layer l. Thus, ai =
+zi
+(l)
+f (zi ).
+α
+Learning rate parameter
+sl
+Number of units in layer l (not counting the bias unit).
+nl
+Number layers in the network. Layer L1 is usually the input
+layer, and layer Lnl the output layer.
+λ
+Weight decay parameter.
+x̂
+For an autoencoder, its output; i.e., its reconstruction of the
+input x. Same meaning as hW,b (x).
+ρ
+Sparsity parameter, which specifies our desired level of sparsity
+ρ̂i
+The average activation of hidden unit i (in the sparse autoencoder).
+β
+Weight of the sparsity penalty term (in the sparse autoencoder
+objective).
+x
+y
+
+19
+
+

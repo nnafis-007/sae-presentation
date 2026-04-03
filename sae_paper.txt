@@ -1,0 +1,2299 @@
+A Survey on Sparse Autoencoders:
+Interpreting the Internal Mechanisms of Large Language Models
+Dong Shu1,† , Xuansheng Wu2,† , Haiyan Zhao3,† , Daking Rai4 ,
+Ziyu Yao4 , Ninghao Liu2 , Mengnan Du3
+1
+Northwestern University 2 University of Georgia
+3
+New Jersey Institute of Technology 4 George Mason University
+dongshu2024@u.northwestern.edu, {xw54582,ninghao.liu}@uga.edu,
+{hz54,mengnan.du}@njit.edu, {drai2,ziyuyao}@gmu.edu
+
+arXiv:2503.05613v3 [cs.LG] 23 Sep 2025
+
+Abstract
+Large Language Models (LLMs) have transformed natural language processing, yet their
+internal mechanisms remain largely opaque.
+Recently, mechanistic interpretability has attracted significant attention from the research
+community as a means to understand the inner
+workings of LLMs. Among various mechanistic interpretability approaches, Sparse Autoencoders (SAEs) have emerged as a promising
+method due to their ability to disentangle the
+complex, superimposed features within LLMs
+into more interpretable components. This paper presents a comprehensive survey of SAEs
+for interpreting and understanding the internal
+workings of LLMs. Our major contributions
+include: (1) exploring the technical framework
+of SAEs, covering basic architecture, design
+improvements, and effective training strategies;
+(2) examining different approaches to explaining SAE features, categorized into input-based
+and output-based explanation methods; (3) discussing evaluation methods for assessing SAE
+performance, covering both structural and functional metrics; and (4) investigating real-world
+applications of SAEs in understanding and manipulating LLM behaviors.
+
+1
+
+Introduction
+
+Large Language Models (LLMs), such as GPT4 (OpenAI et al., 2024), Claude-3.5 (Anthropic,
+2024), DeepSeek-R1 (DeepSeek-AI et al., 2025),
+and Grok-3 (xAI, 2025), have emerged as powerful
+tools in natural language processing, demonstrating
+remarkable capabilities in tasks ranging from text
+generation to complex reasoning. However, their
+increasing size and complexity have created significant challenges in understanding their internal representations and decision-making processes. This
+“black box” nature of LLMs has sparked a growing interest in mechanistic interpretability (Bereska
+and Gavves, 2024a; Zhao et al., 2024a; Rai et al.,
+
+2024; Zhao et al., 2024b), a field that aims to break
+down LLMs into understandable components and
+systematically analyze how these components interact to understand their behaviors.
+Among the various approaches to interpreting
+LLMs, Sparse Autoencoders (SAEs) (Cunningham
+et al., 2023; Bricken et al., 2023; Gao et al., 2025;
+Rajamanoharan et al., 2024b; Galichin et al., 2025)
+have emerged as a particularly promising direction
+for addressing a fundamental challenge in LLM
+interpretability: polysemanticity. Many neurons in
+LLMs are polysemantic, responding to seemingly
+unrelated concepts or features simultaneously. This
+is a phenomenon likely resulting from superposition (Elhage et al., 2022), where LLMs represent
+more independent features than they have neurons
+by encoding each feature as a linear combination
+of neurons. SAEs address this issue by learning
+an overcomplete, sparse representation of neural
+activations, effectively disentangling these superimposed features into more interpretable units. By
+training a sparse autoencoder to reconstruct the activations of a target network layer while enforcing
+sparsity constraints, SAEs can extract a larger set
+of monosemantic features that offer clearer insights
+into what information the LLM is processing. This
+approach has shown promise in transforming the
+often-inscrutable activations of LLMs into more
+human-understandable representations, potentially
+creating a more effective vocabulary for mechanistic analysis of these complex systems.
+1.1
+
+Contribution and Uniqueness
+
+Our Contributions. In this paper, we provide a
+comprehensive overview of SAE for LLM interpretability, with major contributions listed as following: (1) We explore the technical framework
+of SAEs, including their basic architecture, various design improvements, and effective training
+strategies (Section 2). (2) We examine different approaches to analyzing and explaining SAE features,
+
+...
+
+...
+
+on Function
+
+...
+
+Next-word Prediction
+
+Sparse Autoencoder
+
+Transfomer Block
+
+Open Source
+LLMs
+Transformer Model
+Claude-3
+10/23
+05/23
+
+GPT-2 Neuron
+05/23
+
+...
+
+Toy Model
+09/22
+Neurons
+
+Transfomer Block
+
+Token
+
+Close Source
+
+Reconstruction
+
+Sparsity
+
+(a) SAE Framework
+
+Small Size
+
+GPT-4
+06/24
+
+GPT-2
+02/24
+
+LLaMa-3.1
+10/24
+
+Pythia-70m
+12/23
+
+Gemma-2
+08/24
+
+Stage
+(b) SAE History
+
+Figure 1: (a) This figure illustrates the fundamental framework of a Sparse Autoencoder (SAE). SAE is trained
+to take a model representation z as input and project it to an overcomplete sparse activation h(z) by learning to
+reconstruct the original input ẑ. The SAE typically comprises an encoder, a decoder, and a loss function for training.
+(b) The development of the SAE progresses through multiple stages. Note that we only list some representative
+SAE models in this timeline rather than providing an exhaustive compilation.
+
+categorized broadly into input-based and outputbased explanation methods (Section 3). (3) We discuss evaluation methodologies for assessing SAE
+performance, covering both structural metrics and
+functional metrics (Section 4). (4) We discuss realworld applications of SAEs in understanding and
+manipulating LLMs (Section 5). (5) Additionally,
+in the appendix, we also introduce key motivations
+for SAE, discuss connection of SAEs to the broader
+field of mechanistic interpretability, provide experimental evaluations, and highlight current research
+challenges and promising future directions.
+Differences with Existing Surveys. Several existing surveys take a broad perspective on LLM
+interpretability. For instance, some surveys provide
+comprehensive overviews of general explainability
+methods for LLMs (Ferrando et al., 2024; Zhao
+et al., 2024a), while others focus specifically on
+mechanistic interpretability as a whole (Rai et al.,
+2024; Bereska and Gavves, 2024b). In contrast,
+our work uniquely focuses exclusively on SAEs as
+a specific and promising approach within the mechanistic interpretability landscape. By narrowing
+our scope to SAEs, we are able to provide a much
+more comprehensive and detailed analysis of their
+principles, architectures, training methodologies,
+evaluation techniques, and practical applications.
+
+2
+
+Technical Framework of SAEs
+
+2.1
+
+Basic SAE Framework
+
+SAE is a neural network that learns an overcomplete dictionary for representation reconstruction.
+As shown in Figure 1a, the input of SAE is the representation of a token from LLMs, which is mapped
+
+onto a sparse vector of dictionary activations.
+Input. Given a LLM denoted as f with a total
+of L transformer layers, we consider an input sequence x = (x0 , . . . , xN ) with N tokens, where
+each xn ∈ x represents a token in the sequence.
+As the sequence x is processed by the LLM, each
+token xn produces representations at different layers. For a specific layer l, we denote the hidden
+(l)
+representation corresponding to token xn as zn ,
+(l)
+where zn ∈ Rd indicates the embedding vector
+(l)
+of dimension d. Each representation zn serves as
+input to SAEs. In the following, we may omit the
+superscript (l) of layers to simplify the notation.
+(l)
+After extracting the representation zn , the SAE
+takes it as input, decomposes it into a sparse representation, and then reconstructs it. The SAE
+framework is typically composed of three key components: the encoder, which maps the input representation to a higher-dimensional sparse activation;
+the decoder, which reconstructs the original representation from this sparse activation; and the loss
+function, which ensures accurate reconstruction
+while enforcing sparsity constraints.
+Encoding Step. Given an input representation
+z ∈ Rd , the encoder applies a linear transformation
+using a weight matrix Wenc ∈ Rd×m and a bias
+term benc ∈ Rm , followed by an activation function σ to enforce sparsity. The encoding operation
+is defined as:
+h(z) = σ (z · Wenc + benc ) ,
+
+(1)
+
+where h(z) ∈ Rm represents the sparse activation
+vector, which helps disentangle superposition features. The σ activation function could take differ-
+
+Table 1: Taxonomy of SAE Frameworks: An Overview of Basic and Variant Architectures.
+Category
+
+Examples
+
+Activation
+
+Citations
+
+Basic SAE Framework (§2.1)
+
+l2 -norm SAE
+
+ReLU
+
+Ferrando et al. (2024)
+
+Improve Architecture (§C.1)
+
+Gated SAE
+TopK SAE
+Batch TopK SAE
+ProLU SAE
+JumpReLU SAE
+Switch SAE
+
+Jump ReLU
+TopK
+Batch TopK
+ProLU
+Jump ReLU
+TopK
+
+Rajamanoharan et al. (2024a)
+Gao et al. (2025)
+Bussmann et al. (2024)
+Taggart (2024)
+Rajamanoharan et al. (2024b)
+Mudide et al. (2024)
+
+Layer Group SAE
+Feature Choice SAE
+Mutual Choice SAE
+Feature Aligned SAE
+End-to-end SAE
+Formal Languages SAE
+Specialized SAE
+
+Jump ReLU
+TopK
+TopK
+TopK
+ReLU
+ReLU
+ReLU
+
+Ghilardi et al. (2024)
+Ayonrinde (2024)
+Ayonrinde (2024)
+Marks et al. (2024)
+Braun et al. (2025)
+Menon et al. (2024)
+Muhamed et al. (2024)
+
+Improve Training Strategy (§C.2)
+
+ent formats (see Table 1). For example, σ could
+be ReLU (x) = max (0, x), ensures that only nonnegative values pass through, encouraging sparsity
+by setting negative values to zero.
+Since the SAE constructs an overcomplete dictionary to facilitate sparse activation, the number
+of learned dictionary elements m is chosen to be
+larger than the input dimension d (i.e., m ≫ d).
+This overcompleteness allows the encoder to learn
+a richer and more expressive representation of the
+input, making it possible to reconstruct the original
+data using only a sparse subset of dictionary elements. The output h(z) from the encoder is then
+passed to the decoding stage, where it is mapped
+back to the original input space to reconstruct z.
+Decoding Step. After the encoding step, the next
+stage in the SAE framework is the decoding process, where the sparse activation vector h(z) is
+mapped back to the original input space. This step
+ensures that the sparse features learned by the encoder contain sufficient information to accurately
+reconstruct the original representation. The decoding operation is defined as:
+ẑ = SAE(z) = h(z) · Wdec + bdec ,
+
+using a loss function that balances minimizing the
+reconstruction error and enforcing sparsity. This
+trade-off ensures that the learned dictionary elements provide a compact yet expressive representation of the input data.
+Loss Function. The activation vector h(z) is encouraged to be sparse, meaning that most of its
+values should be zero. Take the ReLU activation
+for example, while the activation function after the
+encoder enforces basic sparsity by setting negative
+values to zero, it does not necessarily eliminate
+small positive values, which can still contribute to
+a dense representation. Therefore, additional sparsity enforcement is required. This is achieved using
+a sparsity regularization term in the loss function,
+which further promotes a minimal number of active features. Beyond enforcing sparsity, the SAE
+must also ensure that the learned sparse activation
+retains sufficient information to accurately reconstruct the original input z. The loss function for
+training the SAE consists of two key components:
+reconstruction loss and sparsity regularization:
+L(z) = ∥z − ẑ∥22 + α∥h(z)∥1 ,
+
+(3)
+
+(2)
+
+where Wdec ∈ Rm×d is the decoder weight matrix.
+bdec ∈ Rd is the decoder bias term. ẑ ∈ Rd is the
+reconstructed output, which aims to approximate
+the original input z.
+The accuracy of the reconstruction and the interpretability of the learned representation depends
+heavily on the effectiveness and sparsity of the activation vector h(z). Therefore, the SAE is trained
+
+where reconstruction loss ensures that the SAE
+learns to reconstruct the input data accurately,
+meaning the features encoded in the sparse representation must also be present in the input activations. On the other hand, sparsity regularization
+enforces sparsity by penalizing nonzero values in
+h(z), and α is a hyper-parameter to control the
+penalty level of the sparsity. Specifically, without
+the sparsity loss, SAEs could simply memorize the
+
+training data, reconstructing the input without disentangling meaningful features. However, once
+the sparsity loss is introduced, the model is forced
+to activate only a small subset of neurons for reconstructing the input activation. This constraint
+encourages the SAE to focus on the most informative and critical features to reconstruct the input
+activation. A higher value of α enforces stronger
+sparsity by shrinking more values in h(z) to zero,
+but this may lead to information loss and degraded
+reconstruction quality. A lower value of α prioritizes reconstruction accuracy but may result in less
+sparsity, reducing the interpretability of the learned
+features. Thus, selecting an optimal α is crucial for
+achieving a balance between interpretability and
+accurate data representation.
+2.2
+
+Different SAE Variants
+
+As SAEs continue to emerge as a powerful tool for
+interpreting the internal representations of LLMs,
+researchers have increasingly focused on refining
+and extending their capabilities. Various SAE variants have been proposed to address the limitations
+of traditional SAEs, each introducing improvements from different perspectives. In this section,
+we categorize these advancements into two main
+groups: Improve Architectural, which modify the
+structure and design of the traditional SAE, and
+Improve Training Strategy, which retain the original architecture but introduce novel methods to
+enhance training efficiency, feature selection, and
+sparsity enforcement. A taxonomy of representative SAE frameworks is presented in Table 1.
+Due to page limitations, examples for each group
+are provided in Appendix C.1 (Improved Architectural) and Appendix C.2 (Improved Training
+Strategy). We also discuss challenges encountered
+during SAE training in Appendix C.3.
+
+3
+
+Explainability Analysis of SAEs
+
+methods to interpret a learned feature vector.
+3.1
+
+Input-based Explanations
+
+MaxAct. The most straightforward way to collect
+natural language explanation is by selecting a set of
+texts whose hidden representation can maximally
+activate a certain feature vector we are interpreting (Bricken et al., 2023; Lee et al., 2023). Formally, given a large corpus X where each text span
+x ∈ V N consists of N words, the MaxAct strategy
+finds K text spans that could maximally activate
+our interested learned feature vector wm :
+X
+⊤
+Im = arg max
+f<l (x) · wm
+, (4)
+X ′ ⊂X ,|X |=K x∈X ′
+
+where f<l (x) indicates generating the hidden representation of input text x at the l-th layer, and l is
+the layer our SAE is trained for. This strategy is
+reasonable for interpreting weight vectors of SAEs
+because of the sparse nature of SAEs, which indicates that a learned feature vector should only be
+activated by a certain pattern/concept. Therefore,
+summarizing the most activated text spans can give
+us a clue to understanding the semantic meaning
+encoded by the learned feature vector.
+PruningMaxAct. While MaxAct collects text
+spans that maximally activate a feature vector,
+these spans often contain extraneous or redundant
+phrases that can obscure the underlying concept.
+Building on the Neuron-to-Graph approach (Foote
+et al., 2023), researchers (Gao et al., 2025) introduce a pruning operation to remove irrelevant tokens from each text span, thereby retaining only
+the minimal context necessary to preserve strong
+activation. Formally, let p(·) be a pruning strategy
+that maps text x to p(x), and let p−1 (·) recover
+the original text from its pruned version. The final
+pruned spans are then gathered via:
+X
+⊤
+Im =
+arg max
+f<l (x) · wm
+,
+X ′ ⊂p(X ), |X ′ |=K x∈X ′
+
+This section aims to interpret the learned feature
+vectors from a trained SAE with natural language.
+Specifically, given a pre-defined vocabulary set V,
+the goal of the explainability analysis is to extract
+a subset of words Im ⊂ V to represent the meaning of wm = Wdec [m], for m = 1, ..., M . Humans can understand the meaning of wm by reading their natural language explanations Im . There
+are two lines of work for this purpose, namely the
+input-based and output-based methods. Figure 2
+visualizes generated explanations of using different
+
+⊤
+f<l (p−1 (x)) · wm
+s.t. ∀x ∈ p(X ),
+≥ 0.5,
+⊤
+f<l (x) · wm
+
+(5)
+
+where the condition enforces that the pruned text
+p(x) retains at least half of the original activation.
+In practice, p(·) can be instantiated by removing
+selected tokens or replacing them with padding.
+According to Gao et al. (2025), this PruningMaxAct technique yields higher recall (i.e., finds more
+relevant examples) but lower precision compared
+to the original MaxAct strategy.
+
+VocabProj
+Negative Logits
+
+Positive Logits
+
+Statistical Analysis
+
+impegno
+
+-0.39
+
+consumer
+
+0.71
+
+wikipagina
+
+-0.34
+
+Food
+
+0.70
+
+alugar
+
+-0.32
+
+food
+
+0.70
+
+financière
+
+-0.32
+
+??
+
+0.67
+
+telefónica
+
+-0.32
+
+Foods
+
+0.67
+
+auroit
+
+-0.30
+
+FOODS
+
+0.66
+
+Empfang
+
+-0.30
+
+product
+
+0.65
+
+jurk
+
+-0.29
+
+FOOD
+
+0.64
+
+désert
+
+-0.28
+
+products
+
+0.64
+
+1000
+500
+
+0
+
+0.5
+
+1
+
+20k
+10k
+
+-0.4
+
+0
+
+0.7
+
+MaxAct
+morphological?or?physico-chemical?structure?of?native?starch?is?disrupted?in?some?way,?such?as?in?food?preparation.?The?most?
+common?way?to?modify?starch?is?to?apply?heat.?Cooking?pits,?hearths,?and?ovens?that?may?have?come?into?contact?with?starchy?
+material?yield?modified?starches?which?can?provide?other?insights.
+
+Figure 2: The figure illustrates the interpretation of a learned SAE feature using VocabProj and MaxAct. VocabProj
+lists words with the highest logits in “Positive Logits” column, and lowest logits in “Negative Logits” column.
+The upper histogram in Statistical Analysis shows the distribution of randomly sampled non-zero activations, with
+the y-axis representing the number of sampled activations and the x-axis indicating activation scores. The lower
+histogram depicts the logit density, where the y-axis represents the number of tokens and the x-axis corresponds
+to logit scores. MaxAct highlights tokens in an input text that strongly activate the learned feature. The figure
+references the Neuronpedia website (Lin, 2023).
+
+3.2
+
+Output-based Explanations
+
+VocabProj. Output-based explanations project the
+learned feature vectors to the output word embeddings of words to compute the activations. Mathematically, fout (w) : V → Rd denotes the output word embedding layer that returns the output
+embeddings of a word w, and we can collect the
+natural language explanations by:
+X
+⊤
+Im = arg max
+fout (w) · wm
+. (6)
+V ′ ⊂V, |V ′ |=K w∈V ′
+
+This mapping process makes sense for decoderonly LLMs because the layers in such models share
+the same residual stream, enabling the representations in the intermediate layers to be linear correlated to the output word embeddings (Nostalgebraist, 2020). Recently, researchers (Wu et al.,
+2025b; Gur-Arieh et al., 2025) find that outputbased explanations show a stronger promise in interpreting and controlling LLM behaviors (i.e., generated texts) compared to the input-based ones.
+MutInfo. The VocabProj assumes that the output
+embeddings that maximally activate an interested
+feature vector can best describe the meaning of the
+learned feature. However, this assumption may fail
+for frequent words, whose embeddings often have
+large l2 norm (Gao et al., 2019). To address this,
+Wu et al. (2025b) proposes extracting a vocabulary
+
+subset that maximizes mutual information with the
+learned feature. Formally, let C denote knowledge
+encoded by wc , the explanations are extracted by
+Im =
+
+arg max MI(V ′ ; C) ∝
+V ′ ⊂V,|V ′ |=M
+
+∝
+
+arg max
+V ′ ⊂V,|V ′ |=M
+
+arg min H(C|V ′ )
+V ′ ⊂V,|V ′ |=M
+
+X
+
+(7)
+p(w|wm ) log p(wm |w),
+
+w∈V ′
+
+where MI(·; ·) indicates mutual information between two variables (Cover, 1999), H(·|·) is the
+conditional entropy, and U (C) includes all possible
+vectors that express the knowledge C. Practically,
+the conditional probabilities can be estimated by:
+⊤
+exp(fout (w) · wm
+)
+,
+′ ) · w⊤ )
+exp(f
+(w
+out
+m
+w′ ∈V
+
+p(w|wm ) = P
+
+exp(fout (w) · wc⊤ )
+p(wc |w) = P
+.
+⊤
+c′ ∈C exp(fout (w) · Wc′ )
+
+(8)
+
+Compared with VocabProj, that only considers
+p(w|wm ), this mutual-information-driven objective highlights the need to normalize the raw activation with p(wm |w). That is, if a word whose output
+embedding consistently activates various feature
+vectors, it loses specification for interpretation.
+
+4
+
+Evaluation Metrics and Methods
+
+Evaluating SAEs is inherently challenging due to
+the absence of ground truth labels. Unlike traditional machine learning tasks where performance
+
+can be directly measured against labeled data, the
+quality of an SAE must be inferred through a diverse set of metrics. These metrics assess both
+the internal structure of the model and its functional utility. To provide a comprehensive evaluation framework, we categorize SAE evaluation
+methods into two main groups: structural metrics
+and functional metrics. This categorization ensures
+a holistic assessment of SAEs, covering both their
+training behavior and real-world applicability.
+4.1
+
+Structural Metrics
+
+Structural metrics focus on assessing whether an
+SAE behaves as intended during training. SAEs
+are designed to optimize both reconstruction fidelity and sparsity, as these properties are explicitly enforced in the training loss. Therefore, natural
+evaluation metrics assess reconstruction accuracy
+and sparsity in the model’s learned representations.
+Reconstruction Fidelity. The most fundamental
+way to evaluate reconstruction fidelity is through
+Mean Squared Error (MSE) and Cosine Similarity (Ng et al., 2011), which directly compare the
+original activations with SAE-reconstructed activations. Additional metrics such as Fraction of
+Variance Unexplained (FVU) (also known as normalized loss) (Gao et al., 2025) and Explained Variance (Karvonen et al., 2024) measure how much
+variance in the original data is retained after SAE
+reconstructs. Beyond direct reconstruction comparisons, researchers also evaluate how SAEs affect the probability distribution of model outputs.
+Cross-Entropy Loss (Shannon, 1948) and KL Divergence (Kullback and Leibler, 1951) measure
+the shift in probability distributions when substituting original model activations with SAE-generated
+activations. If the SAE faithfully reconstructs activations, the probability distributions should remain
+similar. Similarly, Delta LM Loss (Lieberum et al.,
+2024) quantifies the difference between the original
+language model loss and the loss incurred when
+replacing activations with those from the SAE. Another important aspect of reconstruction fidelity is
+magnitude preservation. The L2 Ratio (Karvonen
+et al., 2024) compares the Euclidean norms of different activations to ensure that the SAE does not
+systematically alter activation magnitudes.
+Sparsity. A key design objective of SAEs is sparsity, which ensures that only a small subset of latent neurons activate for any given input. The most
+direct metric for sparsity is L0 Sparsity (Louizos
+et al., 2017), which measures the average number
+
+of nonzero activations per input. However, sparsity
+is not just about minimizing activations; it also requires ensuring that the active features are meaningful. To assess feature usage patterns, Latent Firing
+Frequency (He et al., 2024) and Feature Density
+Statistics (Karvonen et al., 2024) track how often
+each SAE latent is activated across different inputs,
+ensuring that features are neither too frequent nor
+inactive. Additionally, the Sparsity-fidelity Tradeoff (Gao et al., 2025) evaluates whether adjusting
+sparsity affects reconstruction quality, helping to
+determine the optimal balance between sparsity
+and fidelity.
+4.2
+
+Functional Metrics
+
+While structural metrics ensure that an SAE follows its design principles, functional metrics assess
+whether the SAE is useful for real-world analysis. These include interpretability, which assesses
+whether the SAE’s learned features correspond to
+meaningful and distinct concepts, and robustness,
+which evaluates whether the learned representations are stable and generalizable.
+Interpretability. One of the primary motivations
+for SAEs is to enhance interpretability by disentangling LLM activations into meaningful features.
+A crucial property for interpretability is monosemanticity, where each feature should encode a single concept. RAVEL and Automated Interpretability (Karvonen et al., 2024) automatically evaluate
+monosemanticity by using a language model to generate and assess feature descriptions. These methods analyze the most activating contexts for each
+feature and assign interpretability scores. Sparse
+Probing and Targeted Probe Perturbation (TPP)
+(Karvonen et al., 2024) evaluate whether SAE features align with specific downstream tasks. In
+sparse probing, a linear probe is trained using only
+a small subset of SAE activations, while TPP measures how much perturbing individual latents impacts probe accuracy. If a small number of active
+features enable strong performance, the SAE has
+learned disentangled and meaningful representations. Beyond evaluating feature alignment, it is
+also crucial to assess the faithfulness of feature
+descriptions. Input-Based Evaluation and OutputBased Evaluation (Gur-Arieh et al., 2025) provide
+a framework for verifying whether feature descriptions accurately reflect what a feature represents.
+Input-Based Evaluation tests whether a given feature description correctly identifies which inputs
+activate the feature by generating activating and
+
+neutral examples and measuring activation differences. Output-Based Evaluation assesses whether a
+feature description captures the causal influence of
+the feature on model outputs by modifying feature
+activations and comparing the resulting generated
+texts. Feature Absorption (Karvonen et al., 2024)
+assesses whether a feature is capturing multiple independent concepts instead of a single interpretable
+concept. If adding more features does not significantly improve representation quality, it suggests
+that the extracted features are already sufficient.
+Another approach to detecting whether each neuron is monosemantic is checking for redundancy
+or overlap with other neurons. Feature Geometry
+Analysis (He et al., 2024; Bricken et al., 2023; Templeton et al., 2024) detects redundancy among SAE
+latents by measuring cosine similarity between decoder columns. If two features have high cosine
+similarity, they may represent redundant concepts
+rather than independent units.
+Robustness. In addition to being interpretable,
+a well-designed SAE should be robust in various
+contexts. Robustness ensures that SAEs do not
+overfit to a specific dataset or condition but instead generalize effectively. Generalizability (He
+et al., 2024) assesses whether SAEs remain effective when applied to out-of-distribution data. Two
+common tests for generalizability include evaluating whether SAEs trained on shorter text sequences
+still perform well on longer sequences and checking whether SAEs trained on base LLM activations
+generalize to instruction-finetuned models. Unlearning (Karvonen et al., 2024) measures whether
+an SAE can selectively forget specific features
+while preserving useful information. This is crucial
+for applications that require privacy-focused models, where sensitive information needs to be erased.
+Spurious Correlation Removal (SCR) (Karvonen
+et al., 2024) tests whether an SAE can eliminate
+biased correlations in downstream models. If removing certain latents reduces unwanted correlations without harming performance, the SAE has
+learned to capture and remove spurious patterns.
+Moreover, we provide a comprehensive comparison of SAEs using both structural and functional
+metrics in Appendix D.
+
+5
+
+Applications in Large Language Models
+
+The latents learned by SAEs represent a collection
+of low-level concepts. Each SAE latent can be
+interpreted through gathering its activating exam-
+
+ples (Lin, 2023). This approach enables latents to
+be interpreted in a human-understandable manner,
+thereby enhancing our comprehension of how models perform tasks and facilitating more effective
+control of model behaviors.
+5.1
+
+Model Steering
+
+Unlike supervised concept vectors, such as probing
+classifiers (Belinkov, 2022; Zhao et al., 2025; Jin
+et al., 2025), SAEs can simultaneously learn a large
+volume of concept vectors. The learned vectors can
+then be utilized to steer model behaviors in ways
+similar to supervised vectors (See Figure 3). A
+detailed comparison between SAEs and probingbased methods is provided in Appendix F.
+As previously mentioned, SAE latents can be
+employed to produce steering vectors that control
+model outputs related to toxicity, sycophancy, refusal, and emotions. Other steering applications
+have also proven feasible. Recently, a study shows
+that SAE latents are able to capture instructions
+such as translations. These identified latents are
+effective in manipulating models to translate inputs
+according to specific instructions (He et al., 2025).
+Another investigation focusing on semantic search
+demonstrates that SAEs can learn fine-grained semantic concepts at various levels of abstraction.
+These concept vectors can be used to steer models toward related semantic (O’Neill et al., 2024).
+Alternatively, SAEs trained on biological datasets
+can provide biology-related features that enable
+the unlearning of biology-relevant knowledge with
+fewer side effects than existing techniques (Farrell et al., 2024). Given that steering effects are
+generally challenging to control, SAE-TS further
+utilizes SAE latents to optimize steering vectors by
+measuring the changes in SAE feature activation
+caused by steering, thereby helping construct vectors that target relevant features while minimizing
+unwanted effects (Chalnev et al., 2024). Moreover,
+explanations based on SAE latents risk prioritizing linguistic features over semantic meaning. Wu
+et al. (2025b) propose a novel approach that promotes diverse semantic explanations, which has
+been demonstrated to enhance model safety.
+5.2
+
+Model Behavior Analysis
+
+SAEs construct a dictionary of concepts through
+their latents, providing a more fine-grained perspective for concept interpretation. This capability
+enables the analysis of the model’s internal representations and learned knowledge in greater detail.
+
+Sparse Autoencoder
+
+Input
+Embedding
+Transfomer Block
+
+...
+
+...
+
+Transfomer Block
+Unembedding
+...
+
+Logits
+Steered Output
+(a) Steering Vector Extraction
+
+Write a brief angry review in 10 words for the smartphone 'Apple 52 Pro
+Max'.
+Original Output:
+
+...
+
+...
+
+...
+
+Example Input:
+
+Overpriced junk! Laggy, terrible battery, useless updates, worst purchase
+ever!
+Steered Output:
+Steer Happiness Feature:
+Amazing phone! Fast, stunning display, great battery, worth every
+penny!
+Steer Confusion Feature:
+Great camera, but lags? Expensive, yet feels cheap? I?m lost.
+Steer Fact Feature:
+Apple 52 Pro Max doesn?t exist yet, so no review possible.
+
+(b) Steering LLM Behavior
+
+(c) Steered Output Example
+
+Figure 3: The figure illustrates the process of using a SAE to steer the behavior of a LLM, with an example of
+the resulting steered output. In part (a), normally people use SAE to extract a steering vector by comparing two
+representations: z, which lacks a certain feature, and z′ , which contains that feature. In part (b), this steering
+vector is added to the input representation, modifying the LLM’s behavior to align with the desired feature. Part (c)
+demonstrates the example results of this process, where the steered output reflects the steered feature, even when the
+original input prompt is neutral or contradictory to the feature being introduced.
+
+A recent study utilizes SAEs to reveal the mechanism of hallucination, where entity recognition
+plays a pivot role in recalling facts. A direction
+distinguishing whether the model knows an entity is identified, which is usually used for hallucination refusal in chat models (Ferrando et al.,
+2025). Some studies focus on interpreting how
+in-context learning (ICL) is performed within models. One study focuses on general ICL tasks, and
+task-related function vectors were successfully isolated (Kharlapenko et al., 2024). Another study focuses on reinforcement learning (RL) tasks. Their
+experiment shows that an LLM’s internal representations are capable of capturing temporal difference
+errors and Q-values that are essential in RL computations (Demircan et al., 2025). Besides, one
+study attempts to examine the working mechanism
+of instruction following. Their analysis on translation tasks shows that instructions are composed
+of multiple relevant concepts rather than individual
+ones (He et al., 2025).
+Moreover, SAEs have been employed to study
+behaviors related to toxicity, sycophancy, refusal,
+and emotions. One recent study shows that features captured by SAEs can be used to construct
+probes to classify cross-lingual toxicity (Gallifant
+et al., 2025). By examining SAE latents that activate on anger-related tokens, researchers have
+identified steering vectors that control angry out-
+
+puts (Nanda et al., 2024). Additionally, other research demonstrates that SAEs can reconstruct vectors responsible for refusing to answer harmful
+questions as well as directions that produce sycophantic responses (neverix et al., 2024). Please
+refer to Appendix E for more LLM applications.
+
+6
+
+Conclusions
+
+In this survey, we provided a comprehensive examination of SAEs as a promising approach to interpreting and understanding LLMs. SAEs effectively
+address the challenge of polysemanticity through
+learning overcomplete, sparse representations that
+disentangle superimposed features into more interpretable units. We have systematically explored
+the foundational principles, technical frameworks,
+evaluation methodologies, and real-world applications of SAEs in the context of LLM analysis.
+While SAEs have demonstrated considerable success in revealing the internal mechanisms of LLMs,
+several challenges remain. In Appendix G, we
+discussed detailed research challenges, including
+the incompleteness of concept dictionaries, limited theoretical foundations, persistent reconstruction errors, and substantial computational requirements. Despite these challenges, SAEs continue
+to evolve through architectural innovations and improved training strategies, offering deeper insights
+into the inner workings of complex LLMs.
+
+Limitations
+Many concepts central to SAEs, such as polysemanticity, superposition, and feature disentanglement, have been extensively studied under different frameworks including distributed representations, disentangled representation learning, and
+sparse coding in computer vision and signal processing. This paper focuses specifically on introducing SAEs during the LLM era, examining their
+applications in interpreting transformer-based language models, and does not extensively cover these
+concepts’ history in adjacent fields.
+
+Acknowledgments
+Mengnan Du is in part supported by National Science Foundation (NSF) Grant #2310261. Ninghao
+Liu is supported by the National Science Foundation (NSF) Grant #2223768 and #2507128. The
+views and conclusions in this paper are those of the
+authors and should not be interpreted as representing any funding agencies.
+
+References
+Anthropic. 2024. [link].
+Anthropic. 2024. Introducing Claude 3.5 Sonnet. Announcement of Claude 3.5 Sonnet model release, featuring improved intelligence, vision capabilities, and
+new Artifacts feature.
+Sanjeev Arora, Yuanzhi Li, Yingyu Liang, Tengyu Ma,
+and Andrej Risteski. 2018. Linear algebraic structure of word senses, with applications to polysemy.
+Transactions of the Association for Computational
+Linguistics, 6:483–495.
+Kola Ayonrinde. 2024. Adaptive sparse allocation with
+mutual choice & feature choice sparse autoencoders.
+arXiv preprint arXiv:2411.02124.
+Yonatan Belinkov. 2022. Probing classifiers: Promises,
+shortcomings, and advances. Computational Linguistics, 48(1):207–219.
+Leonard Bereska and Efstratios Gavves. 2024a. Mechanistic interpretability for ai safety–a review. arXiv
+preprint arXiv:2404.14082.
+Leonard Bereska and Stratis Gavves. 2024b. Mechanistic interpretability for ai safety-a review. Transactions on Machine Learning Research.
+Stella Biderman, Hailey Schoelkopf, Quentin Gregory
+Anthony, Herbie Bradley, Kyle O’Brien, Eric Hallahan, Mohammad Aflah Khan, Shivanshu Purohit,
+USVSN Sai Prashanth, Edward Raff, et al. 2023.
+Pythia: A suite for analyzing large language models across training and scaling. In International
+
+Conference on Machine Learning, pages 2397–2430.
+PMLR.
+Steven Bills, Nick Cammarata, Dan Mossing, Henk Tillman, Leo Gao, Gabriel Goh,
+Ilya Sutskever, Jan Leike, Jeff Wu, and
+William Saunders. 2023.
+Language models can explain neurons in language models.
+https://openaipublic.blob.core.windows.
+net/neuron-explainer/paper/index.html.
+Joseph Bloom. 2024. Open source sparse autoencoders
+for all residual stream layers of gpt2 small.
+Dan Braun, Jordan Taylor, Nicholas Goldowsky-Dill,
+and Lee Sharkey. 2025. Identifying functionally important features with end-to-end sparse dictionary
+learning. Advances in Neural Information Processing Systems, 37:107286–107325.
+Trenton Bricken, Adly Templeton, Joshua Batson,
+Brian Chen, Adam Jermyn, Tom Conerly, Nick
+Turner, Cem Anil, Carson Denison, Amanda Askell,
+Robert Lasenby, Yifan Wu, Shauna Kravec, Nicholas
+Schiefer, Tim Maxwell, Nicholas Joseph, Zac
+Hatfield-Dodds, Alex Tamkin, Karina Nguyen,
+Brayden McLean, Josiah E Burke, Tristan Hume,
+Shan Carter, Tom Henighan, and Christopher
+Olah. 2023. Towards monosemanticity: Decomposing language models with dictionary learning.
+Transformer Circuits Thread. Https://transformercircuits.pub/2023/monosemanticfeatures/index.html.
+Bart Bussmann, Patrick Leask, and Neel Nanda. 2024.
+Batchtopk sparse autoencoders. arXiv preprint
+arXiv:2412.06410.
+Sviatoslav Chalnev, Matthew Siu, and Arthur Conmy.
+2024.
+Improving steering vectors by targeting sparse autoencoder features. arXiv preprint
+arXiv:2411.02193.
+Thomas M Cover. 1999. Elements of information theory.
+John Wiley & Sons.
+Hoagy Cunningham, Aidan Ewart, Logan Riggs, Robert
+Huben, and Lee Sharkey. 2023. Sparse autoencoders
+find highly interpretable features in language models.
+arXiv preprint arXiv:2309.08600.
+Yann N Dauphin, Angela Fan, Michael Auli, and David
+Grangier. 2017. Language modeling with gated convolutional networks. In International conference on
+machine learning, pages 933–941. PMLR.
+DeepSeek-AI, Daya Guo, Dejian Yang, Haowei Zhang,
+Junxiao Song, Ruoyu Zhang, Runxin Xu, Qihao Zhu,
+Shirong Ma, Peiyi Wang, Xiao Bi, Xiaokang Zhang,
+Xingkai Yu, Yu Wu, Z. F. Wu, Zhibin Gou, Zhihong
+Shao, Zhuoshu Li, Ziyi Gao, Aixin Liu, Bing Xue,
+Bingxuan Wang, Bochao Wu, Bei Feng, Chengda Lu,
+Chenggang Zhao, Chengqi Deng, Chenyu Zhang,
+Chong Ruan, Damai Dai, Deli Chen, Dongjie Ji,
+Erhang Li, Fangyun Lin, Fucong Dai, Fuli Luo,
+Guangbo Hao, Guanting Chen, Guowei Li, H. Zhang,
+
+Han Bao, Hanwei Xu, Haocheng Wang, Honghui
+Ding, Huajian Xin, Huazuo Gao, Hui Qu, Hui Li,
+Jianzhong Guo, Jiashi Li, Jiawei Wang, Jingchang
+Chen, Jingyang Yuan, Junjie Qiu, Junlong Li, J. L.
+Cai, Jiaqi Ni, Jian Liang, Jin Chen, Kai Dong, Kai
+Hu, Kaige Gao, Kang Guan, Kexin Huang, Kuai
+Yu, Lean Wang, Lecong Zhang, Liang Zhao, Litong
+Wang, Liyue Zhang, Lei Xu, Leyi Xia, Mingchuan
+Zhang, Minghua Zhang, Minghui Tang, Meng Li,
+Miaojun Wang, Mingming Li, Ning Tian, Panpan
+Huang, Peng Zhang, Qiancheng Wang, Qinyu Chen,
+Qiushi Du, Ruiqi Ge, Ruisong Zhang, Ruizhe Pan,
+Runji Wang, R. J. Chen, R. L. Jin, Ruyi Chen,
+Shanghao Lu, Shangyan Zhou, Shanhuang Chen,
+Shengfeng Ye, Shiyu Wang, Shuiping Yu, Shunfeng
+Zhou, Shuting Pan, S. S. Li, Shuang Zhou, Shaoqing
+Wu, Shengfeng Ye, Tao Yun, Tian Pei, Tianyu Sun,
+T. Wang, Wangding Zeng, Wanjia Zhao, Wen Liu,
+Wenfeng Liang, Wenjun Gao, Wenqin Yu, Wentao
+Zhang, W. L. Xiao, Wei An, Xiaodong Liu, Xiaohan
+Wang, Xiaokang Chen, Xiaotao Nie, Xin Cheng, Xin
+Liu, Xin Xie, Xingchao Liu, Xinyu Yang, Xinyuan Li,
+Xuecheng Su, Xuheng Lin, X. Q. Li, Xiangyue Jin,
+Xiaojin Shen, Xiaosha Chen, Xiaowen Sun, Xiaoxiang Wang, Xinnan Song, Xinyi Zhou, Xianzu Wang,
+Xinxia Shan, Y. K. Li, Y. Q. Wang, Y. X. Wei, Yang
+Zhang, Yanhong Xu, Yao Li, Yao Zhao, Yaofeng
+Sun, Yaohui Wang, Yi Yu, Yichao Zhang, Yifan Shi,
+Yiliang Xiong, Ying He, Yishi Piao, Yisong Wang,
+Yixuan Tan, Yiyang Ma, Yiyuan Liu, Yongqiang Guo,
+Yuan Ou, Yuduan Wang, Yue Gong, Yuheng Zou, Yujia He, Yunfan Xiong, Yuxiang Luo, Yuxiang You,
+Yuxuan Liu, Yuyang Zhou, Y. X. Zhu, Yanhong Xu,
+Yanping Huang, Yaohui Li, Yi Zheng, Yuchen Zhu,
+Yunxian Ma, Ying Tang, Yukun Zha, Yuting Yan,
+Z. Z. Ren, Zehui Ren, Zhangli Sha, Zhe Fu, Zhean
+Xu, Zhenda Xie, Zhengyan Zhang, Zhewen Hao,
+Zhicheng Ma, Zhigang Yan, Zhiyu Wu, Zihui Gu, Zijia Zhu, Zijun Liu, Zilin Li, Ziwei Xie, Ziyang Song,
+Zizheng Pan, Zhen Huang, Zhipeng Xu, Zhongyu
+Zhang, and Zhen Zhang. 2025. Deepseek-r1: Incentivizing reasoning capability in llms via reinforcement learning. Preprint, arXiv:2501.12948.
+Can Demircan, Tankred Saanum, Akshay Kumar Jagadish, Marcel Binz, and Eric Schulz. 2025. Sparse
+autoencoders reveal temporal difference learning in
+large language models. In The Thirteenth International Conference on Learning Representations.
+Jonathan Donnelly and Adam Roegiest. 2019. On interpretability and feature representations: an analysis
+of the sentiment neuron. In Advances in Information
+Retrieval: 41st European Conference on IR Research,
+ECIR 2019, Cologne, Germany, April 14–18, 2019,
+Proceedings, Part I 41, pages 795–802. Springer.
+Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey,
+Abhishek Kadian, Ahmad Al-Dahle, Aiesha Letman,
+Akhil Mathur, Alan Schelten, Amy Yang, Angela
+Fan, et al. 2024. The llama 3 herd of models. arXiv
+preprint arXiv:2407.21783.
+Nelson Elhage, Tristan Hume, Catherine Olsson,
+Nicholas Schiefer, Tom Henighan, Shauna Kravec,
+
+Zac Hatfield-Dodds, Robert Lasenby, Dawn Drain,
+Carol Chen, Roger Grosse, Sam McCandlish, Jared
+Kaplan, Dario Amodei, Martin Wattenberg, and
+Christopher Olah. 2022. Toy models of superposition. Transformer Circuits Thread.
+Eoin Farrell, Yeu-Tong Lau, and Arthur Conmy. 2024.
+Applying sparse autoencoders to unlearn knowledge
+in language models. In Neurips Safe Generative AI
+Workshop 2024.
+Manaal Faruqui, Yulia Tsvetkov, Dani Yogatama, Chris
+Dyer, and Noah Smith. 2015. Sparse overcomplete word vector representations. arXiv preprint
+arXiv:1506.02004.
+Javier Ferrando, Oscar Balcells Obeso, Senthooran Rajamanoharan, and Neel Nanda. 2025. Do i know this
+entity? knowledge awareness and hallucinations in
+language models. In The Thirteenth International
+Conference on Learning Representations.
+Javier Ferrando, Gabriele Sarti, Arianna Bisazza, and
+Marta R Costa-jussà. 2024. A primer on the inner workings of transformer-based language models.
+arXiv preprint arXiv:2405.00208.
+Alex Foote, Neel Nanda, Esben Kran, Ioannis Konstas,
+Shay Cohen, and Fazl Barez. 2023. Neuron to graph:
+Interpreting language model neurons at scale. arXiv
+preprint arXiv:2305.19911.
+Andrey Galichin, Alexey Dontsov, Polina Druzhinina,
+Anton Razzhigaev, Oleg Y Rogov, Elena Tutubalina,
+and Ivan Oseledets. 2025. I have covered all the
+bases here: Interpreting reasoning features in large
+language models via sparse autoencoders. arXiv
+preprint arXiv:2503.18878.
+Jack Gallifant, Shan Chen, Kuleen Sasse, Hugo Aerts,
+Thomas Hartvigsen, and Danielle S Bitterman. 2025.
+Sparse autoencoder features for classifications and
+transferability. arXiv preprint arXiv:2502.11367.
+Jun Gao, Di He, Xu Tan, Tao Qin, Liwei Wang, and TieYan Liu. 2019. Representation degeneration problem
+in training natural language generation models. arXiv
+preprint arXiv:1907.12009.
+Leo Gao, Tom Dupre la Tour, Henk Tillman, Gabriel
+Goh, Rajan Troll, Alec Radford, Ilya Sutskever, Jan
+Leike, and Jeffrey Wu. 2025. Scaling and evaluating
+sparse autoencoders. In The Thirteenth International
+Conference on Learning Representations.
+Atticus Geiger, Duligur Ibeling, Amir Zur, Maheep
+Chaudhary, Sonakshi Chauhan, Jing Huang, Aryaman Arora, Zhengxuan Wu, Noah Goodman, Christopher Potts, et al. 2023. Causal abstraction: A theoretical foundation for mechanistic interpretability.
+arXiv preprint arXiv:2301.04709.
+Davide Ghilardi, Federico Belotti, and Marco Molinari. 2024. Efficient training of sparse autoencoders
+for large language models via layer groups. arXiv
+preprint arXiv:2410.21508.
+
+Mario Giulianelli, Jacqueline Harding, Florian Mohnert,
+Dieuwke Hupkes, and Willem Zuidema. 2018. Under
+the hood: Using diagnostic classifiers to investigate
+and improve how language models track agreement
+information. arXiv preprint arXiv:1808.08079.
+Karol Gregor and Yann LeCun. 2010. Learning fast
+approximations of sparse coding. In Proceedings of
+the 27th international conference on international
+conference on machine learning, pages 399–406.
+Clément Guerner, Anej Svete, Tianyu Liu, Alexander Warstadt, and Ryan Cotterell. 2023. A geometric notion of causal probing. arXiv preprint
+arXiv:2307.15054.
+Yoav Gur-Arieh, Roy Mayan, Chen Agassy, Atticus
+Geiger, and Mor Geva. 2025. Enhancing automated
+interpretability with output-centric feature descriptions. arXiv preprint arXiv:2501.08319.
+Zhengfu He, Wentao Shu, Xuyang Ge, Lingjie Chen,
+Junxuan Wang, Yunhua Zhou, Frances Liu, Qipeng
+Guo, Xuanjing Huang, Zuxuan Wu, et al. 2024.
+Llama scope: Extracting millions of features from
+llama-3.1-8b with sparse autoencoders. arXiv
+preprint arXiv:2410.20526.
+Zirui He, Haiyan Zhao, Yiran Qiao, Fan Yang, Ali
+Payani, Jing Ma, and Mengnan Du. 2025. Saif: A
+sparse autoencoder framework for interpreting and
+steering instruction following of language models.
+arXiv preprint arXiv:2502.11356.
+Irina Higgins, David Amos, David Pfau, Sebastien
+Racaniere, Loic Matthey, Danilo Rezende, and
+Alexander Lerchner. 2018. Towards a definition
+of disentangled representations. arXiv preprint
+arXiv:1812.02230.
+Geoffrey E Hinton. 1984. Distributed representations.
+Mingyu Jin, Qinkai Yu, Jingyuan Huang, Qingcheng
+Zeng, Zhenting Wang, Wenyue Hua, Haiyan Zhao,
+Kai Mei, Yanda Meng, Kaize Ding, et al. 2025. Exploring concept depth: How large language models
+acquire knowledge and concept at different layers?
+In Proceedings of the 31st International Conference
+on Computational Linguistics, pages 558–573.
+
+Been Kim, Martin Wattenberg, Justin Gilmer, Carrie
+Cai, James Wexler, Fernanda Viegas, et al. 2018. Interpretability beyond feature attribution: Quantitative
+testing with concept activation vectors (tcav). In International conference on machine learning, pages
+2668–2677. PMLR.
+Hyunjik Kim and Andriy Mnih. 2018. Disentangling by
+factorising. In International conference on machine
+learning, pages 2649–2658. PMLR.
+Solomon Kullback and Richard A Leibler. 1951. On
+information and sufficiency. The annals of mathematical statistics, 22(1):79–86.
+Justin Lee, Tuomas Oikarinen, Arjun Chatha, Keng-Chi
+Chang, Yilan Chen, and Tsui-Wei Weng. 2023. The
+importance of prompt tuning for automated neuron
+explanations. arXiv preprint arXiv:2310.06200.
+Tom Lieberum, Senthooran Rajamanoharan, Arthur
+Conmy, Lewis Smith, Nicolas Sonnerat, Vikrant
+Varma, János Kramár, Anca Dragan, Rohin Shah,
+and Neel Nanda. 2024. Gemma scope: Open sparse
+autoencoders everywhere all at once on gemma 2.
+arXiv preprint arXiv:2408.05147.
+Johnny Lin. 2023. Neuronpedia: Interactive reference
+and tooling for analyzing neural networks. Software
+available from neuronpedia.org.
+Francesco Locatello, Stefan Bauer, Mario Lucic, Gunnar Raetsch, Sylvain Gelly, Bernhard Schölkopf, and
+Olivier Bachem. 2019. Challenging common assumptions in the unsupervised learning of disentangled representations. In international conference on
+machine learning, pages 4114–4124. PMLR.
+Christos Louizos, Max Welling, and Diederik P Kingma.
+2017. Learning sparse neural networks through l_0
+regularization. arXiv preprint arXiv:1712.01312.
+Luke Marks, Alasdair Paren, David Krueger, and Fazl
+Barez. 2024. Enhancing neural network interpretability with feature-aligned sparse autoencoders. arXiv
+preprint arXiv:2411.01220.
+Kevin Meng, David Bau, Alex Andonian, and Yonatan
+Belinkov. 2022. Locating and editing factual associations in gpt. Advances in neural information processing systems, 35:17359–17372.
+
+Subhash Kantamneni, Joshua Engels, Senthooran Rajamanoharan, Max Tegmark, and Neel Nanda. 2025.
+Are sparse autoencoders useful? a case study in
+sparse probing. Preprint, arXiv:2502.16681.
+
+Abhinav Menon, Manish Shrivastava, David Krueger,
+and Ekdeep Singh Lubana. 2024. Analyzing (in)
+abilities of saes via formal languages. arXiv preprint
+arXiv:2410.11767.
+
+A Karvonen, C Rager, J Lin, C Tigges, J Bloom,
+D Chanin, YT Lau, E Farrell, A Conmy, C McDougall, et al. 2024. Saebench: A comprehensive
+benchmark for sparse autoencoders, december 2024.
+URL https://www. neuronpedia. org/sae-bench/info.
+
+Tomas Mikolov, Ilya Sutskever, Kai Chen, Greg S Corrado, and Jeff Dean. 2013a. Distributed representations of words and phrases and their compositionality.
+Advances in neural information processing systems,
+26.
+
+Dmitrii Kharlapenko, neverix, Neel Nanda, and Authur
+Conmy. 2024. Extracting SAE task features for incontext learning. [Accessed 26-02-2025].
+
+Tomáš Mikolov, Wen-tau Yih, and Geoffrey Zweig.
+2013b. Linguistic regularities in continuous space
+word representations. In Proceedings of the 2013
+
+conference of the north american chapter of the association for computational linguistics: Human language technologies, pages 746–751.
+Anish Mudide, Joshua Engels, Eric J Michaud, Max
+Tegmark, and Christian Schroeder de Witt. 2024. Efficient dictionary learning with switch sparse autoencoders. arXiv preprint arXiv:2410.08201.
+Aashiq Muhamed, Mona Diab, and Virginia Smith.
+2024. Decoding dark matter: Specialized sparse
+autoencoders for interpreting rare concepts in foundation models. arXiv preprint arXiv:2411.00743.
+Neel Nanda, Arthur Conmy, Lewis Smith, Senthooran
+Rajamanoharan, Tom Lieberum, János Kramár, and
+Vikrant Varma. 2024. [Full Post] Progress Update
+#1 from the GDM Mech Interp Team. [Accessed
+26-02-2025].
+Neel Nanda, Andrew Lee, and Martin Wattenberg. 2023.
+Emergent linear representations in world models of
+self-supervised sequence models. arXiv preprint
+arXiv:2309.00941.
+neverix, Dmitrii Kharlapenko, Arthur Conmy, and Neel
+Nanda. 2024. SAE features for refusal and sycophancy steering vectors. [Accessed 26-02-2025].
+Andrew Ng et al. 2011. Sparse autoencoder. CS294A
+Lecture notes, 72(2011):1–19.
+Anh Nguyen, Jason Yosinski, and Jeff Clune. 2019. Understanding neural networks via feature visualization:
+A survey. Explainable AI: interpreting, explaining
+and visualizing deep learning, pages 55–76.
+Angus Nicolson, Lisa Schut, J Alison Noble, and
+Yarin Gal. 2024. Explaining explainability: Understanding concept activation vectors. arXiv preprint
+arXiv:2404.03713.
+Nostalgebraist. 2020. Interpreting gpt: the logit lens.
+Chris Olah. 2023. Distributed representations: Composition & superposition. Transformer Circuits Thread,
+27.
+Bruno A Olshausen and David J Field. 1997. Sparse
+coding with an overcomplete basis set: A strategy
+employed by v1? Vision research, 37(23):3311–
+3325.
+Charles O’Neill, Christine Ye, Kartheik Iyer, and
+John F Wu. 2024. Disentangling dense embeddings with sparse autoencoders. arXiv preprint
+arXiv:2408.00657.
+OpenAI, Josh Achiam, Steven Adler, Sandhini Agarwal,
+Lama Ahmad, Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida, Janko Altenschmidt, Sam Altman, Shyamal Anadkat, Red Avila, Igor Babuschkin,
+Suchir Balaji, Valerie Balcom, Paul Baltescu, Haiming Bao, Mohammad Bavarian, Jeff Belgum, Irwan Bello, Jake Berdine, Gabriel Bernadett-Shapiro,
+Christopher Berner, Lenny Bogdonoff, Oleg Boiko,
+
+Madelaine Boyd, Anna-Luisa Brakman, Greg Brockman, Tim Brooks, Miles Brundage, Kevin Button,
+Trevor Cai, Rosie Campbell, Andrew Cann, Brittany
+Carey, Chelsea Carlson, Rory Carmichael, Brooke
+Chan, Che Chang, Fotis Chantzis, Derek Chen, Sully
+Chen, Ruby Chen, Jason Chen, Mark Chen, Ben
+Chess, Chester Cho, Casey Chu, Hyung Won Chung,
+Dave Cummings, Jeremiah Currier, Yunxing Dai,
+Cory Decareaux, Thomas Degry, Noah Deutsch,
+Damien Deville, Arka Dhar, David Dohan, Steve
+Dowling, Sheila Dunning, Adrien Ecoffet, Atty Eleti,
+Tyna Eloundou, David Farhi, Liam Fedus, Niko Felix,
+Simón Posada Fishman, Juston Forte, Isabella Fulford, Leo Gao, Elie Georges, Christian Gibson, Vik
+Goel, Tarun Gogineni, Gabriel Goh, Rapha GontijoLopes, Jonathan Gordon, Morgan Grafstein, Scott
+Gray, Ryan Greene, Joshua Gross, Shixiang Shane
+Gu, Yufei Guo, Chris Hallacy, Jesse Han, Jeff Harris,
+Yuchen He, Mike Heaton, Johannes Heidecke, Chris
+Hesse, Alan Hickey, Wade Hickey, Peter Hoeschele,
+Brandon Houghton, Kenny Hsu, Shengli Hu, Xin
+Hu, Joost Huizinga, Shantanu Jain, Shawn Jain,
+Joanne Jang, Angela Jiang, Roger Jiang, Haozhun
+Jin, Denny Jin, Shino Jomoto, Billie Jonn, Heewoo Jun, Tomer Kaftan, Łukasz Kaiser, Ali Kamali, Ingmar Kanitscheider, Nitish Shirish Keskar,
+Tabarak Khan, Logan Kilpatrick, Jong Wook Kim,
+Christina Kim, Yongjik Kim, Jan Hendrik Kirchner, Jamie Kiros, Matt Knight, Daniel Kokotajlo,
+Łukasz Kondraciuk, Andrew Kondrich, Aris Konstantinidis, Kyle Kosic, Gretchen Krueger, Vishal
+Kuo, Michael Lampe, Ikai Lan, Teddy Lee, Jan
+Leike, Jade Leung, Daniel Levy, Chak Ming Li,
+Rachel Lim, Molly Lin, Stephanie Lin, Mateusz
+Litwin, Theresa Lopez, Ryan Lowe, Patricia Lue,
+Anna Makanju, Kim Malfacini, Sam Manning, Todor
+Markov, Yaniv Markovski, Bianca Martin, Katie
+Mayer, Andrew Mayne, Bob McGrew, Scott Mayer
+McKinney, Christine McLeavey, Paul McMillan,
+Jake McNeil, David Medina, Aalok Mehta, Jacob
+Menick, Luke Metz, Andrey Mishchenko, Pamela
+Mishkin, Vinnie Monaco, Evan Morikawa, Daniel
+Mossing, Tong Mu, Mira Murati, Oleg Murk, David
+Mély, Ashvin Nair, Reiichiro Nakano, Rajeev Nayak,
+Arvind Neelakantan, Richard Ngo, Hyeonwoo Noh,
+Long Ouyang, Cullen O’Keefe, Jakub Pachocki, Alex
+Paino, Joe Palermo, Ashley Pantuliano, Giambattista Parascandolo, Joel Parish, Emy Parparita, Alex
+Passos, Mikhail Pavlov, Andrew Peng, Adam Perelman, Filipe de Avila Belbute Peres, Michael Petrov,
+Henrique Ponde de Oliveira Pinto, Michael, Pokorny, Michelle Pokrass, Vitchyr H. Pong, Tolly Powell, Alethea Power, Boris Power, Elizabeth Proehl,
+Raul Puri, Alec Radford, Jack Rae, Aditya Ramesh,
+Cameron Raymond, Francis Real, Kendra Rimbach,
+Carl Ross, Bob Rotsted, Henri Roussez, Nick Ryder, Mario Saltarelli, Ted Sanders, Shibani Santurkar,
+Girish Sastry, Heather Schmidt, David Schnurr, John
+Schulman, Daniel Selsam, Kyla Sheppard, Toki
+Sherbakov, Jessica Shieh, Sarah Shoker, Pranav
+Shyam, Szymon Sidor, Eric Sigler, Maddie Simens,
+Jordan Sitkin, Katarina Slama, Ian Sohl, Benjamin
+Sokolowsky, Yang Song, Natalie Staudacher, Felipe Petroski Such, Natalie Summers, Ilya Sutskever,
+
+Jie Tang, Nikolas Tezak, Madeleine B. Thompson,
+Phil Tillet, Amin Tootoonchian, Elizabeth Tseng,
+Preston Tuggle, Nick Turley, Jerry Tworek, Juan Felipe Cerón Uribe, Andrea Vallone, Arun Vijayvergiya,
+Chelsea Voss, Carroll Wainwright, Justin Jay Wang,
+Alvin Wang, Ben Wang, Jonathan Ward, Jason Wei,
+CJ Weinmann, Akila Welihinda, Peter Welinder, Jiayi Weng, Lilian Weng, Matt Wiethoff, Dave Willner,
+Clemens Winter, Samuel Wolrich, Hannah Wong,
+Lauren Workman, Sherwin Wu, Jeff Wu, Michael
+Wu, Kai Xiao, Tao Xu, Sarah Yoo, Kevin Yu, Qiming Yuan, Wojciech Zaremba, Rowan Zellers, Chong
+Zhang, Marvin Zhang, Shengjia Zhao, Tianhao
+Zheng, Juntang Zhuang, William Zhuk, and Barret Zoph. 2024. Gpt-4 technical report. Preprint,
+arXiv:2303.08774.
+
+Noam Shazeer, Azalia Mirhoseini, Krzysztof Maziarz,
+Andy Davis, Quoc Le, Geoffrey Hinton, and Jeff
+Dean. 2017. Outrageously large neural networks:
+The sparsely-gated mixture-of-experts layer. arXiv
+preprint arXiv:1701.06538.
+
+Kiho Park, Yo Joong Choe, and Victor Veitch. 2023.
+The linear representation hypothesis and the geometry of large language models. arXiv preprint
+arXiv:2311.03658.
+
+Jihoon Tack, Jack Lanchantin, Jane Yu, Andrew Cohen, Ilia Kulikov, Janice Lan, Shibo Hao, Yuandong
+Tian, Jason Weston, and Xian Li. 2025. Llm pretraining with continuous concepts. arXiv preprint
+arXiv:2502.08524.
+
+Jeffrey Pennington, Richard Socher, and Christopher D
+Manning. 2014. Glove: Global vectors for word representation. In Proceedings of the 2014 conference
+on empirical methods in natural language processing
+(EMNLP), pages 1532–1543.
+Alec Radford, Rafal Jozefowicz, and Ilya Sutskever.
+2017. Learning to generate reviews and discovering
+sentiment. arXiv preprint arXiv:1704.01444.
+Alec Radford, Jeffrey Wu, Rewon Child, David Luan,
+Dario Amodei, Ilya Sutskever, et al. 2019. Language
+models are unsupervised multitask learners. OpenAI
+blog, 1(8):9.
+Daking Rai, Yilun Zhou, Shi Feng, Abulhair Saparov,
+and Ziyu Yao. 2024. A practical review of mechanistic interpretability for transformer-based language
+models. arXiv preprint arXiv:2407.02646.
+Senthooran Rajamanoharan, Arthur Conmy, Lewis
+Smith, Tom Lieberum, Vikrant Varma, János Kramár,
+Rohin Shah, and Neel Nanda. 2024a. Improving
+dictionary learning with gated sparse autoencoders.
+arXiv preprint arXiv:2404.16014.
+Senthooran Rajamanoharan, Tom Lieberum, Nicolas
+Sonnerat, Arthur Conmy, Vikrant Varma, János
+Kramár, and Neel Nanda. 2024b. Jumping ahead: Improving reconstruction fidelity with jumprelu sparse
+autoencoders. arXiv preprint arXiv:2407.14435.
+Marks Samuel, Karvonen Adam, and Mueller Aaron.
+2024. dictionary learning. https://github.com/
+saprmarks/dictionary_learning.
+Naomi Saphra and Sarah Wiegreffe. 2024. Mechanistic?
+arXiv preprint arXiv:2410.09087.
+Claude E Shannon. 1948. A mathematical theory of
+communication. The Bell system technical journal,
+27(3):379–423.
+Noam Shazeer. 2020. Glu variants improve transformer.
+arXiv preprint arXiv:2002.05202.
+
+Anant Subramanian, Danish Pruthi, Harsh Jhamtani,
+Taylor Berg-Kirkpatrick, and Eduard Hovy. 2018.
+Spine: Sparse interpretable neural embeddings. In
+Proceedings of the AAAI conference on artificial intelligence, volume 32.
+Christian Szegedy, Wojciech Zaremba, Ilya Sutskever,
+Joan Bruna, Dumitru Erhan, Ian Goodfellow, and
+Rob Fergus. 2013. Intriguing properties of neural
+networks. arXiv preprint arXiv:1312.6199.
+
+Glen Taggart. 2024. Prolu: A nonlinearity for sparse
+autoencoders - ai alignment forum.
+Gemma Team, Morgane Riviere, Shreya Pathak,
+Pier Giuseppe Sessa, Cassidy Hardin, Surya Bhupatiraju, Léonard Hussenot, Thomas Mesnard, Bobak
+Shahriari, Alexandre Ramé, et al. 2024. Gemma 2:
+Improving open language models at a practical size.
+arXiv preprint arXiv:2408.00118.
+Adly Templeton, Tom Conerly, Jonathan Marcus, Jack
+Lindsey, Trenton Bricken, Brian Chen, Adam Pearce,
+Craig Citro, Emmanuel Ameisen, Andy Jones, Hoagy
+Cunningham, Nicholas L Turner, Callum McDougall,
+Monte MacDiarmid, C. Daniel Freeman, Theodore R.
+Sumers, Edward Rees, Joshua Batson, Adam Jermyn,
+Shan Carter, Chris Olah, and Tom Henighan. 2024.
+Scaling monosemanticity: Extracting interpretable
+features from claude 3 sonnet. Transformer Circuits
+Thread.
+Jesse Vig, Sebastian Gehrmann, Yonatan Belinkov,
+Sharon Qian, Daniel Nevo, Yaron Singer, and Stuart
+Shieber. 2020. Investigating gender bias in language
+models using causal mediation analysis. Advances
+in neural information processing systems, 33:12388–
+12401.
+Benjamin Wright and Lee Sharkey. 2024. Addressing
+feature suppression in saes - ai alignment forum.
+Xuansheng Wu, Wenhao Yu, Xiaoming Zhai, and Ninghao Liu. 2025a. Self-regularization with latent space
+explanations for controllable llm-based classification.
+arXiv preprint arXiv:2502.14133.
+Xuansheng Wu, Jiayi Yuan, Wenlin Yao, Xiaoming
+Zhai, and Ninghao Liu. 2025b. Interpreting and
+steering llms with mutual information-based explanations on sparse autoencoders. arXiv preprint
+arXiv:2502.15576.
+
+Zhengxuan Wu, Aryaman Arora, Atticus Geiger, Zheng
+Wang, Jing Huang, Dan Jurafsky, Christopher D.
+Manning, and Christopher Potts. 2025c. Axbench:
+Steering llms? even simple baselines outperform
+sparse autoencoders. Preprint, arXiv:2501.17148.
+xAI. 2025. Grok 3 beta — the age of reasoning
+agents. Blog post announcing Grok 3 Beta, describing improvements in reasoning capabilities and performance benchmarks.
+Xianjun Yang, Shaoliang Nie, Lijuan Liu, Suchin Gururangan, Ujjwal Karn, Rui Hou, Madian Khabsa, and
+Yuning Mao. 2025. Diversity-driven data selection
+for language model tuning through sparse autoencoder. arXiv preprint arXiv:2502.14050.
+Qingyu Yin, Chak Tou Leong, Hongbo Zhang, Minjun
+Zhu, Hanqi Yan, Qiang Zhang, Yulan He, Wenjie Li,
+Jun Wang, Yue Zhang, et al. 2024. Direct preference
+optimization using sparse feature-level constraints.
+arXiv preprint arXiv:2411.07618.
+Haiyan Zhao, Hanjie Chen, Fan Yang, Ninghao Liu,
+Huiqi Deng, Hengyi Cai, Shuaiqiang Wang, Dawei
+Yin, and Mengnan Du. 2024a. Explainability for
+large language models: A survey. ACM Transactions
+on Intelligent Systems and Technology, 15(2):1–38.
+Haiyan Zhao, Fan Yang, Bo Shen, Himabindu
+Lakkaraju, and Mengnan Du. 2024b. Towards
+uncovering how large language model works:
+An explainability perspective.
+arXiv preprint
+arXiv:2402.10688.
+Haiyan Zhao, Heng Zhao, Bo Shen, Ali Payani, Fan
+Yang, and Mengnan Du. 2025. Beyond single concept vector: Modeling concept subspace in llms with
+gaussian distribution. The Thirteenth International
+Conference on Learning Representations.
+
+A
+
+Why Sparse Autoencoders?
+
+As LLMs continue to grow rapidly in size, interpretation becomes more challenging, as the complexity of their latent space and internal representations
+also expands exponentially. SAEs have emerged as
+a powerful tool to understand how LLMs make decisions. This ability is known as mechanistic interpretability, which aims to reverse-engineer models
+by breaking down their internal computations into
+understandable, interpretable components. SAE
+is designed to learn a sparse, linear, and decomposable representation of the internal activations
+of a LLM. It enforces a sparsity constraint so that
+only a few features are active at any given time.
+This encourages each active feature to correspond
+to a specific, understandable concept. This simplification allows researchers to focus on a few key
+features rather than being overwhelmed by the full
+complexity of the model. Below, we discuss the
+development history of the SAE for LLMs and
+present Figure 1b to visually depict this progress.
+Due to page limitations, we do not attempt to provide an exhaustive history of SAEs, but instead
+focus on highlighting key milestones in the development of SAEs for mainstream LLMs.
+Explaining Individual Neurons.
+The development of interpretability techniques for
+LLMs has progressed in stages rather than as a
+single step. From 2022 to 2023, researchers at
+OpenAI and Anthropic focused on understanding
+LLMs by examining individual neurons. OpenAI,
+for instance, leveraged GPT-4 to generate natural language explanations for neurons in models
+like GPT-2, attempting to map specific neuron activations to concrete linguistic or conceptual features (Bills et al., 2023). Similarly, Anthropic built
+small toy models trained on synthetic data to observe how features are stored in neurons. These
+early investigations showed that analyzing single
+neurons can provide initial insights (Elhage et al.,
+2022). In addition, it is worth noting that the study
+of explaining individual neurons by labeling interpretable features to them has been extensively
+explored in studies (Radford et al., 2017; Donnelly
+and Roegiest, 2019; Nguyen et al., 2019; Szegedy
+et al., 2013) prior to the introduction of mechanistic
+interpretability.
+However, they soon discovered that analyzing
+individual neurons had significant limitations, as
+neurons in LLMs often exhibit polysemanticity,
+i.e., responding to multiple unrelated inputs within
+
+the same neuron. For instance, a single neuron
+might simultaneously activate for academic citations, English dialogue, HTTP requests, and Korean text (Bricken et al., 2023). This phenomenon
+is largely attributed to superposition, where neural networks represent more independent features
+than available neurons by encoding each feature as
+a linear combination of neurons (Ferrando et al.,
+2024). While this architectural efficiency allows
+models to encode vast amounts of knowledge, it
+makes individual neurons difficult to interpret since
+their activations represent entangled mixtures of
+different concepts. This fundamental challenge
+with neuron-level analysis motivated researchers
+to explore more sophisticated approaches for disentangling these superimposed features, leading to
+the development of sparse autoencoders (SAEs) as
+a promising solution for extracting interpretable,
+monosemantic features from the model’s complex
+internal representations.
+SAEs for Small-size Language Models.
+In late 2023, Anthropic advanced transformer interpretability by moving beyond raw neuron activations to decompose model activations into singleconcept, monosemantic features, addressing the
+polysemanticity of individual neurons in LLMs
+(Cunningham et al., 2023; Bricken et al., 2023).
+They trained SAEs on transformer activation data
+by optimizing a reconstruction loss with a strong
+sparsity constraint. This training forces the autoencoder to represent each activation as a sparse
+combination of basis vectors, with each basis vector ideally capturing a distinct, interpretable concept. SAEs transform the overlapping signals of
+individual neurons into a set of clean, monosemantic features that are much easier to understand.
+This approach offers a clear advantage over traditional neuron-based methods by isolating the key
+features that drive model behavior. The promising experimental results on simpler transformer
+models demonstrated that SAEs provide a more
+effective and scalable route for interpreting model
+internals. Building on this success, later works
+Bloom (2024) and Samuel et al. (2024) applied
+SAE techniques to smaller models such as GPT2 (Radford et al., 2019) and Pythia-70m (Biderman
+et al., 2023), thereby paving the way for their eventual extension to full-scale billion size LLMs.
+SAEs for Large Language Models.
+After witnessing the success of SAEs on smallerscale models, the third stage of their development
+
+emerged in 2024, when Anthropic (Templeton
+et al., 2024) and OpenAI (Gao et al., 2025) became the first groups to apply SAEs to their latest
+proprietary LLMs, Claude 3 Sonnet and GPT-4,
+respectively. This marked a significant step forward in understanding these closed-source, blackbox models, even for the researchers who built
+them. However, scaling SAEs from small models
+to full-scale LLMs introduced several new challenges. One major issue was the sheer scale of
+activations in models with billions of parameters,
+which made training and extracting interpretable
+features computationally expensive. Additionally,
+ensuring that extracted features remained monosemantic became increasingly difficult, as feature
+superposition is more prevalent in larger models
+(Templeton et al., 2024). Despite these challenges,
+researchers found that SAEs could effectively decompose polysemantic neurons into monosemantic
+features, revealing meaningful and interpretable
+latent representations within the models. For instance, Anthropic demonstrated that certain neurons in Claude 3 Sonnet encode high-level concepts
+such as “sycophantic praise”, where phrases like “a
+generous and gracious man” strongly activate this
+feature. Similarly, OpenAI’s research on GPT-4
+identified a “humans have flaws” feature, which
+activates on phrases like “My Dad wasn’t perfect
+(are any of us?) but he loved us dearly.” These findings not only deepen our understanding of model
+behavior but also provide powerful interpretability
+tools, allowing the practitioners to better analyze,
+refine, and steer language model outputs.
+As the architecture and mechanisms of SAEs
+become clearer, more researchers have begun to
+follow this approach, applying SAEs to interpret
+open-source models. For example, Google DeepMind (Lieberum et al., 2024) used SAEs to analyze
+Gemma 2 (Team et al., 2024), while He et al. (2024)
+applied similar techniques to LLaMA 3.1 (Dubey
+et al., 2024). This growing adoption highlights
+the increasing role of SAEs in mechanistic interpretability, paving the way for broader transparency
+in both close- and open-source LLMs.
+
+B
+
+Connection of SAEs to the Broader
+Field of Interpretability
+
+The field of mechanistic interpretability (MI) has
+been critiqued for its insufficient engagement with
+the broader interpretability and NLP research literature (Bereska and Gavves, 2024a; Saphra and
+
+Wiegreffe, 2024). Many of the research topics
+within MI, such as polysemanticity, superposition,
+and SAEs, have been investigated in prior and concurrent non-MI fields, often under different terminologies while addressing the same fundamental
+challenges (Saphra and Wiegreffe, 2024; Elhage
+et al., 2022). For instance, the study of polysemanticity and superposition, which aims to understand
+how features are encoded in the model activations,
+have been studied in the context of distributed representations (Hinton, 1984; Mikolov et al., 2013b,a;
+Arora et al., 2018; Olah, 2023), disentangled representations (Higgins et al., 2018; Kim and Mnih,
+2018; Locatello et al., 2019), and concept-based
+interpretability (Nicolson et al., 2024; Kim et al.,
+2018). Similarly, SAEs are closely related to and
+draw inspiration from earlier lines of research on
+sparse coding and dictionary learning (Olshausen
+and Field, 1997; Gregor and LeCun, 2010; Faruqui
+et al., 2015; Subramanian et al., 2018). These methods, like SAEs, posit the feature sparsity hypothesis (Elhage et al., 2022) and aim to learn an overcomplete representation to disentangle the features
+from activation in superposition. Since these fields
+pursue similar goals or study the same research
+problems, the current disconnect causes issues such
+as missing relevant literature, hindering collaboration, unintentionally redefining established concepts, rediscovering existing techniques, and overlooking well-known baselines. Therefore, it is imperative for the MI community to bridge these gaps
+and more actively integrate findings from related
+non-MI research.
+
+C
+
+Different SAE Variants
+
+C.1
+
+Improve Architecture
+
+Gated SAE. The Gated SAE (Rajamanoharan
+et al., 2024a) is a modification of the standard SAE
+that aims to improve the trade-off between reconstruction fidelity and sparsity enforcement. Traditional SAEs suffer from shrinkage bias (Wright and
+Sharkey, 2024), where the L1 -norm regularization
+systematically underestimates feature activations,
+leading to reduced reconstruction accuracy. Inspired by Gated Linear Units (Dauphin et al., 2017;
+Shazeer, 2020), Gated SAEs replace the standard
+ReLU encoder with a gated ReLU encoder, which
+separates the roles of detecting which features are
+active and estimating their magnitudes. Compared
+to traditional SAEs, this architectural separation addresses the shrinkage effect caused by L1 regular-
+
+ization, which adds a linear penalty to all nonzero
+activations, leading to systematic underestimation
+of feature magnitudes.
+
+
+h̃(z) = 1 πgate (z) > 0 ⊙ ReLU(πmag (z)), (9)
+where πgate (z) = Wgate (z−bdec )+bgate is the gating function that determines which features should
+be activated. Wgate is a weight matrix for feature
+selection. πmag (z) = Wmag (z−bdec )+bmag is the
+magnitude estimation function that determines the
+strength of the active features. Wmag is a weight
+matrix for magnitude estimation. 1[·] is the Heaviside step function that binarizes activations and ⊙
+denotes element-wise multiplication. In this case,
+Gated SAEs introduce independent pathways for
+determining which features are activated and their
+respective strengths, reducing bias and improving
+interpretability.
+To optimize the Gated SAE, the
+authors
+introduce
+an auxiliary
+loss
+∥z − ẑfrozen ReLU πgate (z) ∥22 on top of
+the traditional loss function. This encourages the
+gating path to produce useful feature selections
+for reconstruction, without affecting the learned
+decoder weights. Here, ẑfrozen is a copy of the
+decoder with frozen weights.
+TopK SAE. The TopK SAE (Gao et al., 2025) is
+an improvement over the traditional SAE, designed
+to directly enforce sparsity without requiring L1 norm regularization. Instead of penalizing all activations, which can introduce shrinkage bias, TopK
+SAEs enforce sparsity by retaining only the top K
+largest activations and setting the rest to zero. This
+ensures that only the most important features contribute to the learned representation. The encoder
+applies a linear transformation followed by a hard
+TopK selection:
+
+h̃(z) = TopK Wenc (z − bpre ) ,
+(10)
+where Wenc ∈ Rd×m is the encoder weight matrix,
+and bpre ∈ Rm is a pre-normalization bias term
+applied before the TopK selection.
+Since the sparsity constraint is explicitly enforced through the TopK operation, there is no need
+for an additional sparsity regularization term in the
+loss function. The training objective reduces to
+minimizing the reconstruction loss:
+L(z) = ∥z − ẑ∥22 + αLaux ,
+
+(11)
+
+where Laux is an auxiliary loss scaled by the coefficient α, designed to stabilize training and prevent
+dead latents (Templeton et al., 2024).
+
+BatchTopK SAE. The BatchTopK SAE is a modification of the TopK SAE, designed to address the
+limitations of enforcing a fixed number of active
+features per sample. Bussmann et al. (2024) identified two key inefficiencies in the standard TopK
+SAE. First, it forces every token to use exactly
+K features, even when some tokens may require
+fewer or more active features. It also does not allow
+flexibility across a batch, leading to inefficient sparsity control. To overcome these issues, BatchTopK
+SAEs apply the TopK selection globally across the
+entire batch instead of enforcing it per token. This
+means that BatchTopK selects the top K × B activations across the entire batch, where B is the
+batch size. The encoder is modified to:
+
+h̃(Z) = BatchTopK Wenc (Z − bpre ) , (12)
+where Z ∈ RB×d is the input batch matrix, and
+B is the batch size. Similar to TopK SAE, BatchTopK directly controls sparsity through the selection mechanism, it eliminates the need for explicit
+sparsity regularization: L(Z) = ∥Z− Ẑ∥22 +αLaux .
+ProLU SAE. The ProLU SAE (Taggart, 2024)
+introduces a novel activation function called Proportional ReLU, which serves as an alternative to
+ReLU in traditional SAEs. ProLU SAE provides a
+Pareto improvement over both standard SAEs with
+L1 -norm regularization, which suffer from shrinkage bias, and SAEs trained with a Sqrt(L1 ) penalty,
+which attempt to mitigate shrinkage but still do not
+fully address inconsistencies in activation scaling.
+In contrast to ReLU, which applies a fixed threshold at zero, ProLU introduces a learnable threshold
+for each activation, allowing the model to determine the optimal activation boundary dynamically.
+The ProLU activation function is defined as:
+(
+ProLU(mi , bi ) =
+
+mi , if mi + bi > 0 and mi > 0
+,
+0,
+otherwise
+(13)
+
+where mi is the pre-activation output from the encoder, and bi is a learnable bias term that shifts
+the activation threshold. The encoding process in
+ProLU SAE replaces the standard ReLU activation with ProLU, leading to the following encoding
+function:
+h̃(z) = ProLU((z − bdec )Wenc , benc ).
+
+(14)
+
+The ProLU SAE training objective consists of
+the standard reconstruction loss combined with an
+auxiliary sparsity term:
+L(z) = ∥z − ẑ∥22 + λP (h̃(z)),
+
+(15)
+
+where λ is the sparsity penalty coefficient, and
+P (h̃(z)) is a sparsity-inducing function. The authors found that using a Sqrt(L1 ) penalty, defined
+as P (h) = ∥h∥1/2 , provided better sparsity control
+compared to the standard L1 -norm.
+JumpReLU SAE. The JumpReLU SAE (Rajamanoharan et al., 2024b) is a modification of the
+traditional SAE that replaces the standard ReLU
+activation function with JumpReLU. The ReLU
+activation function sets all negative pre-activation
+values to zero but allows small positive values, leading to false positives in feature selection and underestimation of feature magnitudes. JumpReLU
+introduces an explicit threshold θ that zeroes out
+pre-activations below this threshold, ensuring that
+weak activations do not contribute to the reconstruction. The JumpReLU activation function is
+defined as:
+
+by computing a probability distribution over the
+experts:
+p(z) = softmax(Wrouter (z − brouter )),
+
+(19)
+
+where Wrouter is the routing weight matrix. brouter
+is the bias term. p(z) represents the probability of
+selecting each expert. The final reconstruction is
+computed as:
+ẑ = pi∗ (z) Ei∗ (z) (z − bpre ) + bpre ,
+
+(20)
+
+where i∗ (z) is the selected expert for input z.
+To ensure balanced expert utilization and avoid
+expert collapse, Switch SAE incorporates an auxiliary loss for load balancing:
+Laux = N
+
+N
+X
+
+fi · Pi ,
+
+(21)
+
+i=1
+
+JumpReLUθ (z) = z · H(z − θ),
+
+(16)
+
+where θ is a learnable threshold and H(x) is the
+Heaviside step function, which is 1 when x > 0
+and 0 otherwise. The encoder in JumpReLU SAE
+follows a standard linear transformation followed
+by JumpReLU activation:
+h̃(z) = JumpReLUθ (Wenc z + benc ).
+
+(17)
+
+Unlike traditional SAEs that use L1 -norm for sparsity regularization, JumpReLU SAEs directly optimize the L0 -norm, which counts the number of
+nonzero activations: L(z) = ∥z − ẑ∥22 + α∥h(z)∥0 .
+Switch SAE. Inspired by Mixture of Experts
+(MoE) models (Shazeer et al., 2017), Switch SAE
+(Mudide et al., 2024) introduces a more computationally efficient framework for training SAEs.
+Instead of training a single large SAE, Switch
+SAE leverages multiple smaller “expert SAEs”
+E1 , E2 , ..., EN and a routing network that dynamically assigns each input to an appropriate expert.
+This approach enables efficient scaling to a large
+number of features while avoiding the memory and
+FLOP bottlenecks of traditional SAEs. Each “expert SAE” follows a standard TopK SAE formulation:
+(i)
+
+(i)
+
+Ei (z) = Wdec · TopK(Wenc z),
+(i)
+
+(i)
+
+(18)
+
+where Wenc and Wdec are the encoder and decoder
+weight matrices for expert i. The routing network
+determines which expert is assigned to each input
+
+where fi is the fraction of activations assigned to
+expert i, and Pi is the fraction of router probability
+assigned to expert i. This auxiliary loss is then
+added to the traditional reconstruction loss function
+to form the final learning objective.
+C.2
+
+Improve Training Strategy
+
+Layer Group SAE. Traditionally, one SAE is
+trained per layer in a transformer-based LLM, resulting in a substantial number of parameters and
+high computational costs. To address this inefficiency, the Layer Group SAE (Ghilardi et al., 2024)
+clusters multiple layers into groups based on activation similarity and trains a single SAE per group.
+This significantly reduces training time while preserving reconstruction accuracy and interpretability.
+To determine which layers should be grouped together, the method measures the angular similarity
+between layer activations, defined as:
+1
+dangular (zpost , zpost ) = arccos
+π
+p
+
+q
+
+zppost · zqpost
+∥zppost ∥2 ∥zqpost ∥2
+
+!
+,
+(22)
+
+where zppost and zqpost represent post-MLP residual
+stream activations for layers p and q. Using this
+similarity metric, layers with highly correlated activations are clustered together through a hierarchical clustering strategy. The number of groups
+K is chosen based on a computational trade-off,
+balancing efficiency and reconstruction accuracy.
+Once the layer groups are formed, a single SAE
+is trained per group instead of one per layer. The
+SAE architecture and training objective remains
+
+similar as in traditional SAEs, optimizing for both
+reconstruction accuracy and sparsity.
+Feature Choice SAE. Traditional SAEs face several limitations, including dead features, fixed sparsity per token, and lack of adaptive computation.
+Feature Choice SAEs (Ayonrinde, 2024) address
+these issues by imposing a constraint on the number of tokens each feature can be active for, rather
+than restricting the number of active features per
+token. This approach ensures that all features are
+utilized efficiently, preventing feature collapse and
+improving reconstruction accuracy. This sparsity
+allocation constraint is defined as:
+X
+Si,j = m, ∀i, where M = mF,
+(23)
+j
+
+where Si,j is a binary selection matrix, indicating
+whether feature i is active for token j. Each feature
+must be activated for exactly m tokens, enforcing
+uniform feature utilization.
+Mutual Choice SAE. Mutual Choice SAE (Ayonrinde, 2024) remove all constraints on sparsity
+allocation, allowing the model to freely distribute
+its limited total sparsity budget across all tokens
+and features. Unlike TopK SAEs, which enforce a
+fixed number of active features per token, or Feature Choice SAEs, which constrain the number
+of tokens each feature can be assigned to, Mutual
+Choice SAE introduce global sparsity allocation.
+This means that instead of enforcing a per-token
+or per-feature selection, the model selects the top
+M feature-token matches across the entire dataset,
+ensuring that sparsity is allocated adaptively based
+on reconstruction needs. Mathematically, the activation selection process is defined as:
+S = TopKIndices(Z′ , M ),
+
+(24)
+
+where Z′ represents the pre-activation affinity matrix between tokens and features. M is the global
+sparsity budget, denoting the total number of active feature-token pairs allowed. TopKIndices(·)
+selects the top M activations globally, instead of
+enforcing a fixed K per token.
+Feature Aligned SAE. The Feature Aligned SAE
+(Marks et al., 2024) introduces Mutual Feature
+Regularization (MFR), a novel training method designed to improve the interpretability and fidelity of
+learned features in SAEs. Traditional SAEs often
+suffer from feature fragmentation, where meaningful input features get split across multiple decoder
+
+weights, and feature entanglement, where multiple independent input features are merged into a
+single decoder weight. These issues reduce the interpretability of SAEs and limit their effectiveness
+in analyzing neural activations. The key insight behind MFR is that features learned by multiple SAEs
+trained on the same dataset are more likely to align
+with the true underlying structure of the input data.
+To enforce this, Feature Aligned SAE trains multiple SAEs in parallel and applies a MFR penalty
+that encourages them to learn mutually consistent
+features:
+
+LMFR
+
+= α
+
+
+N
+−1 X
+N
+X
+1
+(j)
+(i)
+(1 − MMCS(Wdec , Wdec )) ,
+N (N − 1) i=1 j=i+1
+(25)
+
+(i)
+
+(j)
+
+where Wdec and Wdec are the decoder weight matrices of different SAEs. Mean of Max Cosine
+Similarity (MMCS) measures the degree of alignment between the learned features across SAEs. α
+is a hyperparameter that controls the strength of
+the regularization. This mutual feature regularization is then combined with the traditional SAE loss
+to form the final training objective of the Feature
+Aligned SAE.
+End-to-end SAE. Traditional SAEs often prioritize minimizing reconstruction error rather than
+ensuring that learned features are functionally important to the model’s decision-making. This often
+leads to feature splitting, where a single meaningful
+feature is divided into multiple redundant components. To address this, End-to-end SAE (Braun
+et al., 2025) modifies the training objective to ensure that the discovered features directly influence
+the network’s output. They propose minimizing
+the Kullback-Leibler (KL) divergence between the
+original network’s output distribution and the output distribution when using SAE activations, formulated as:
+Le2e = KL(ŷ, y) + α∥h(z)∥1 .
+
+(26)
+
+To further ensure that activations follow similar
+computational pathways in later layers, they propose E2e + Downstream SAE, which introduces an
+additional downstream reconstruction loss, leading
+to the formulation:
+Le2e+ds = KL(ŷ, y) + α∥h(z)∥1 + β
+
+L
+X
+
+(k)
+
+∥â
+
+−a
+
+(k) 2
+∥2 .
+
+(27)
+
+k=l+1
+
+By shifting the training focus from activation reconstruction to output distribution preservation,
+this method ensures that learned features are more
+
+aligned with the actual computational processes of
+the network while maintaining interpretability.
+Formal Languages SAE. Traditional SAEs effectiveness remains questionable in language models
+due to their reliance on correlations rather than
+causal attributions. While SAEs often recover features that correlate with linguistic structures, such
+as parts of speech or syntactic depth, interventions
+on these features frequently do not influence the
+model’s predictions, suggesting that current training objectives fail to ensure causal relevance. To
+address this, Formal Languages SAE (Menon et al.,
+2024) introduce a causal loss term that explicitly
+encourages SAEs to learn features that impact the
+model’s computation. Their proposed loss function
+is given by:
+L = Lrecon + αLsparse + βLcaus ,
+
+(28)
+
+where Lrecon is the standard reconstruction loss,
+Lsparse enforces sparsity, and Lcaus ensures that interventions on learned features result in predictable
+changes in model output.
+Specialized SAE. Traditional SAEs struggle to
+capture rare and low-frequency concepts, which are
+critical for understanding model behavior in specific subdomains. To address this, Specialized SAE
+(SSAE) (Muhamed et al., 2024) focuses on learning
+rare subdomain-specific features through targeted
+data selection and a novel training objective. Instead of training on the full dataset, SSAE uses
+high-recall dense retrieval methods, such as BM25,
+Contriever, and TracIn reranking, to identify relevant subdomain data, ensuring that rare features
+are well-represented. Additionally, they introduce
+Tilted Empirical Risk Minimization (TERM), an
+objective that optimizes for worst-case reconstruction loss rather than average loss. This is achieved
+by modifying the standard SAE loss function to:
+!
+N
+1 X t·Lw (zi )
+1
+LTERM (t; w) = log
+e
+, (29)
+t
+N
+i=1
+
+where Lw (zi ) is the standard SAE loss for representation zi . N is the size of a minibatch, and t
+is the tilt parameter that controls emphasis on rare
+concept reconstruction.
+C.3
+
+SAE Training
+
+Even though the framework of SAEs is conceptually straightforward, training SAEs is both computationally expensive and data-intensive. The complexity arises due to the overcomplete dictionary
+
+representation, large-scale data requirements, and
+the layer-wise training paradigm necessary for interpreting LLMs. Each of these factors contributes
+to the substantial computational cost associated
+with training SAEs at scale.
+Overcomplete Dictionary Representation. A
+defining characteristic of SAEs is their overcomplete dictionary, where the number of learned features far exceeds the dimensionality of the LLM’s
+latent space. This overcompleteness is what enables SAEs to enforce sparsity, allowing them to
+isolate and extract meaningful feature activations
+from high-dimensional representations. The enforced sparsity is crucial for LLM interpretability, as it helps decompose complex neural activations into more semantically meaningful features.
+Empirical studies highlight the scale of overcompleteness; for example, LLaMa-Scope (He et al.,
+2024) trained SAEs with 32K and 128K features,
+which are 8× and 32× larger than the hidden size
+of LLaMa3.1-8B. This extreme overparameterization provides a highly expressive feature space but
+significantly increases the computational burden
+during training.
+Large-Scale Data Requirements. Since the input to an SAE consists of representations from
+LLMs, an enormous amount of data is required
+to ensure that the model learns a diverse and representative set of activations. To effectively train
+an SAE, it is essential to activate a wide range of
+neurons in the LLM, which necessitates processing large-scale datasets covering diverse linguistic
+structures. Moreover, because SAEs are overcomplete, they require significantly more training data
+to converge. Empirical results from Gemma-Scope
+(Lieberum et al., 2024) illustrate this requirement:
+SAEs with 16.4K features were trained on 4 billion tokens, while 1M-feature SAEs required 16
+billion tokens to reach satisfactory performance.
+This highlights the immense data demands necessary for training effective SAEs. Another challenge
+arises when scaling up the training data, which is
+how to efficiently shuffling massive datasets across
+distributed systems. Shuffling is crucial to prevent
+models from learning spurious, order-dependent
+patterns. However, as datasets grow to terabyte or
+petabyte scales, performing a distributed shuffle becomes a significant engineering hurdle (Anthropic,
+2024).
+Layer-Wise Training. Interpreting an LLM requires understanding its representations at each
+layer, which necessitates training separate SAEs
+
+for different layers of the model. The standard
+approach is to train one SAE per layer, meaning
+that for deep models, this process must be repeated
+across dozens or even hundreds of layers, compounding the computational cost. The necessity of
+layer-wise training is further evidenced by ongoing
+research efforts attempting to reduce the number
+of SAEs required. For example, Layer Group SAE
+(Ghilardi et al., 2024), which we discussed previously, clusters multiple layers into layer groups and
+trains a single SAE per group instead of per layer.
+The emergence of such strategies demonstrates the
+significant computational burden imposed by layerwise SAE training and the ongoing efforts to optimize it.
+
+D
+
+Evaluation and Comparison of SAEs
+
+As shown in Table 2, we evaluate three series of
+SAEs: LLaMa Scope, Pythia SAE, and Gemma
+Scope. For LLaMa Scope, we use the llamascope-lxa-8x SAE trained on layer 12 of the
+LLaMa 3.1 8B model. For Pythia, we evaluate
+the sae-bench-pythia70m-sweep-standard-ctx1280712 SAE, trained on layer 5 of the Pythia 70M
+model. Within the Gemma Scope, we conduct an
+internal comparison across five gemma-scope-2bpt-res SAEs, all trained on layer 12 of the Gemma2
+2B model. These five SAEs differ only in their
+training L0 sparsity settings, meaning they were
+trained to activate different numbers of latents per
+input.
+We report both structural and functional evaluation metrics. The structural metrics, listed at
+the top, include L0 Sparsity, Mean Squared Error (MSE), Cross-Entropy Loss, KL Divergence,
+and Explained Variance. The functional metrics,
+shown below, including Absorption, Spurious Correlation Removal (SCR), and Sparse Probing. In
+the Absorption metric, mean absorption captures
+the fraction of cases where the correct SAE latents
+fail to activate for a known feature, while another
+latent with similar semantics activates instead. Full
+absorption refers to the stricter case where none
+of the correct latents activate and the feature is entirely absorbed by an unintended latent. In SCR, we
+assess how well the SAE reduces unwanted correlations. The Top-5, Top-50, and Top-500 SCR scores
+measure how much debiasing can be achieved by
+removing top 5, 50, 500 latents respectively. Finally, Sparse Probing evaluates whether the SAE
+has learned interpretable and disentangled concepts.
+
+We compare the performance of sparse probes using SAE activations against a baseline probe using
+the LLM’s original dense activations. Higher score
+indicates that the SAE has successfully learned
+concept-specific features.
+Shown in Table 2, the LLaMa Scope SAE shows
+significantly higher L0 sparsity (869.3) compared
+to the others. The Gemma Scope SAEs span a
+range of sparsities, from highly sparse (L0:22 with
+22.1 active latents) to relatively dense (L0:445 with
+472.2). Within the Gemma Scope series, we observe that as sparsity denser, the MSE also decreases, indicating improved reconstruction accuracy. Similarly, both the cross-entropy loss and KL
+divergence scores increase toward 1, suggesting
+that denser SAEs preserve the model’s original predictive behavior more. The explained variance also
+improves with denser sparsity, rising from 0.824 at
+L0:22 to 0.941 at L0:445, which shows that denser
+SAEs are better at capturing the variance of the
+original activations.
+In functional metrics, LLaMa Scope exhibits
+extremely low mean and full absorption values
+(0.0028 and 0.00047), likely due to its high redundancy from overactivation. Among the Gemma
+Scope models, L0:176 achieves the lowest mean
+(0.055) and full (0.038) absorption, suggesting a
+good trade-off between sparsity and disentanglement. Later, absorption increases again at L0:445,
+indicating that overly dense SAEs may begin to
+recombine multiple concepts into the same latent.
+Looking at SCR, all SAEs’ performance improves
+with top-k increase. However, SCR scores begin to
+decrease at Top-500, indicating that over-ablation
+may unintentionally remove useful features. For
+Sparse Probing, we can see that across all models,
+SAE probes perform nearly as well as LLM-based
+probes, with accuracies consistently above 0.95
+for Gemma Scope. Notably, the Pythia SAE and
+Gemma Scope L0:445 achieve sparse probing accuracies that even exceed the LLM baseline, suggesting that these models successfully capture clean,
+task-relevant features using a small set of latents.
+
+E
+
+Other Applications of SAEs in LLMs
+
+E.1
+
+Model Training
+
+SAEs are trained to obtain more sparse and interpretable features. The learned concepts and
+sparsity are both beneficial in model transparency,
+which can be utilized in model training to align
+the model with human understanding and improve
+
+Table 2: Evaluation of SAEs
+LLaMa Scope
+Structural
+
+Absorption
+SCR
+
+Sparse Probing
+
+Sparsity
+MSE
+CE Loss
+KL Div
+Variance
+Mean
+Full
+Top 5
+Top 50
+Top 500
+LLM
+SAE
+
+869.318
+4.9E-5
+1.00
+0.898
+0.863
+2.8E-3
+4.7E-4
+0.137
+0.713
+-0.727
+0.904
+0.885
+
+Pythia SAE
+112.888
+0.015
+0.940
+-1
+0.918
+0.227
+0.199
+0.330
+0.414
+0.232
+0.922
+0.929
+
+model performance. Since SAEs include featurelevel constraints, Yin et al. (2024) leverage these
+constraints to enable sparsity-enforced alignment
+in post-training. Their experiments demonstrate
+that this approach achieves superior performance
+across benchmark datasets with reduced computational costs. Similarly, combine learned concepts
+with next-token prediction training to build more
+transparent models. Specifically, they extract influential concepts on outputs from SAEs, then incorporate these concept vectors into hidden states
+by modifying token embeddings. Results show
+that models trained with this method perform better and exhibit greater robustness on token prediction and knowledge distillation across benchmark
+datasets (Tack et al., 2025). Moreover, SAEs’ ability to provide large-scale explanations has been
+well explored. By examining the diversity of activated features, Yang et al. (2025) developed a
+new approach to augment data diversity. Another
+work uses task-specific features learned in SAEs
+to mitigate unintended features within models, significantly improving model generalization on realworld tasks (Wu et al., 2025a).
+
+F
+
+L0:22
+22.141
+2.125
+0.974
+0.975
+0.824
+0.287
+0.333
+0.206
+0.376
+0.316
+0.952
+
+Gemma Scope
+L0:41 L0:82 L0:176
+41.422 80.472 174.74
+1.836
+1.539
+1.203
+0.984
+0.988
+0.993
+0.984
+0.990
+0.994
+0.848
+0.875
+0.902
+0.267
+0.105
+0.055
+0.275
+0.091
+0.038
+0.217
+0.210
+0.184
+0.385
+0.407
+0.417
+0.309
+0.359
+0.339
+0.958
+0.955
+0.955
+0.957
+
+L0:445
+472.199
+0.707
+0.998
+0.997
+0.941
+0.1347
+0.045
+0.243
+0.384
+0.384
+0.958
+
+2014; Park et al., 2023; Nanda et al., 2023). Probing formulates steering as a supervised learning
+problem, which given a small set of labeled examples, the method learns low-rank projection vectors
+that can both detect and influence the presence of
+target concepts during generation.
+Based on the recent research, SAEs show certain limitations compared to linear probes for language model interpretation. First, the AXBENCH
+study (Wu et al., 2025c) demonstrates that even
+simple linear probe baselines like difference-inmeans consistently outperform SAEs on concept
+detection tasks, with SAEs falling behind on both
+concept detection and model steering benchmarks.
+Second, Kantamneni et al.’s comprehensive evaluation (Kantamneni et al., 2025) across 113 probing
+datasets reveals that SAEs fail to provide consistent advantages in challenging regimes like data
+scarcity, class imbalance, label noise, and covariate shift. There remains a long way for the SAE
+research community to go in making sparse autoencoders more robust, generalizable, and useful
+in practical applications before they can reliably
+outperform simpler interpretability approaches.
+
+SAE and Probing-Based Methods
+
+In addition to SAEs, probing-based methods have
+emerged as a prominent family of techniques for
+interpreting and steering the internal representations of LLMs (Giulianelli et al., 2018; Vig et al.,
+2020; Meng et al., 2022; Guerner et al., 2023;
+Geiger et al., 2023). These methods operate under the assumption that meaningful concepts are
+linearly separable within the model’s representation space (Mikolov et al., 2013b; Pennington et al.,
+
+G
+
+Research Challenges
+
+In this section, we outline several critical research
+challenges with SAEs. Although SAEs have
+emerged as promising tools for providing largescale, fine-grained interpretable explanations, these
+challenges could threaten the faithfulness, effectiveness, and efficiency of their applications.
+
+G.1
+
+Incomplete Concept Dictionary
+
+SAEs are trained on large corpora of data encompassing various concepts. However, achieving
+comprehensive concept coverage remains challenging (Muhamed et al., 2024). Additionally, the learning process of SAEs functions as a black box where
+learned concepts cannot be predetermined. Consequently, controlling the completeness of input and
+output concepts is nearly impossible. Furthermore,
+explanations provided by SAEs may be incomplete
+or misleading due to the conceptual gaps. This limitation can result in unreliable interpretations when
+applying SAEs to complex reasoning tasks that
+require comprehensive knowledge representation.
+G.2
+
+Lack Theoretical Foundations
+
+The development of SAEs is indeed based on assumptions of superposition and linear concept representation. Empirically, we’ve found it effective
+to construct high-level features through linear combinations of low-level features. However, our understanding of how these concepts are represented
+in hidden spaces and their spatial relationships remains limited. This limitation explains why we
+must derive combination parameters empirically
+rather than mathematically. The validity and advancement of SAEs may remain unclear until we
+can properly demonstrate the correctness of these
+fundamental assumptions about concept representation and superposition in neural networks.
+G.3
+
+Reconstruction Errors
+
+SAEs are trained by minimizing the reconstruction
+errors between original and reconstructed activations. However, these errors persist and remain
+poorly understood. Recent research by (Gao et al.,
+2025) demonstrates that reconstruction errors can
+produce significant performance degradation comparable to using a model with only 10% of the pretraining compute. This finding raises substantial
+concerns about SAE accuracy as interpretability
+tools. Furthermore, the impact of these reconstruction errors on model generations has not been adequately measured. The field lacks output-centric
+metrics that could precisely quantify how reconstructed activations affect a model’s final outputs.
+To advance our understanding of SAEs and their reliability as interpretability tools, developing metrics
+that directly measure the effect of reconstruction
+errors on generated content is essential.
+
+G.4
+
+Computational Burden
+
+SAEs operate at the layer level for each model,
+mapping original activations to a much higherdimensional representation space before reconstructing them back to the original space. This
+architecture necessitates that SAE parameters for a
+specific layer significantly outnumber the parameters of that original layer itself. Consequently, the
+overall training computation exceeds that of the
+original model training, particularly problematic
+for LLMs with billions of parameters. The extensive computational resources required create a substantial barrier for researchers interested in investigating these methods. Furthermore, SAEs exhibit
+limited transferability across models, they must
+be trained specifically for each model and each
+layer, exacerbating the computational burden. This
+layer-specific and model-specific training requirement multiplies the already significant resource
+demands, further restricting accessibility for the
+broader research community.
+
+
