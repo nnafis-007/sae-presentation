@@ -93,7 +93,7 @@ z \approx \sum_{i=1}^{m} a_i f_i
 \end{itemize}
 
 \vspace{0.5em}
-\textbf{Goal of SAE-based MI}
+\textbf{Goal of SAE-based Interpretibility}
 \begin{itemize}
   \item Decompose dense/polysemantic representations
   \item Recover sparse, more monosemantic feature activations
@@ -160,23 +160,24 @@ Typical form:
 \end{itemize}
 
 \column{0.53\textwidth}
-\includegraphics[width=\linewidth,height=0.72\textheight,keepaspectratio]{SAE_vs_LLM_comparison.png}
+\begin{center}
+\includegraphics[width=0.94\linewidth,height=0.72\textheight,keepaspectratio]{SAE_vs_LLM_comparison.png}
+\end{center}
 \end{columns}
 \end{frame}
 
 \begin{frame}{SAE Loss (L1-Regularized Form)}
+\begin{columns}[T,onlytextwidth]
+\column{0.55\textwidth}
 From the survey's standard objective:
 \[
 L(z) = \|z - \hat{z}\|_2^2 + \alpha \|h(z)\|_1
 \]
 
-\begin{columns}[T,onlytextwidth]
-\column{0.56\textwidth}
 \begin{itemize}
   \item Reconstruction term keeps information fidelity
   \item $L_1$ term enforces sparse activations
   \item $\alpha$ controls the trade-off
-  \item Tune $\alpha$ to avoid dense coding or dead features
 \end{itemize}
 
 \textbf{Trade-off}
@@ -185,12 +186,29 @@ L(z) = \|z - \hat{z}\|_2^2 + \alpha \|h(z)\|_1
   \item Low $\alpha$: better reconstruction, less disentanglement
 \end{itemize}
 
-\column{0.42\textwidth}
-\includegraphics[width=\linewidth,height=0.56\textheight,keepaspectratio]{SAE_architecture.png}
+\column{0.45\textwidth}
+\begin{center}
+\includegraphics[width=\linewidth,height=0.74\textheight,keepaspectratio]{SAE_architecture.png}
+\end{center}
 \end{columns}
 \end{frame}
 
-\begin{frame}{Training Workflow}
+\begin{frame}{Research Setting}
+\small
+\begin{center}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.22\textwidth} >{\centering\arraybackslash}p{0.23\textwidth} >{\centering\arraybackslash}p{0.23\textwidth} >{\centering\arraybackslash}p{0.23\textwidth}}
+\toprule
+\textbf{Architecture} & \textbf{Dataset} & \textbf{GPT-2 Layer} \\
+\midrule
+Vanilla SAE & BookCorpus & Layer 8 \\
+TopK SAE & Openwebtext &  Layer 9 \\
+Feature Choice SAE & MLCommons/peoples\_speech & Layer 10 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Project Workflow}
 \slideimg{SAE_workflow.png}
 \begin{itemize}
   \item Sample layer activations $z$ from a target LLM layer
@@ -198,6 +216,39 @@ L(z) = \|z - \hat{z}\|_2^2 + \alpha \|h(z)\|_1
   \item Iterate with diagnostics: dead units, density, reconstruction quality
 \end{itemize}
 \end{frame}
+
+\begin{frame}{Architectural Comparison (Quick)}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.2\textwidth} >{\raggedright\arraybackslash}p{0.3\textwidth} >{\raggedright\arraybackslash}p{0.22\textwidth} >{\raggedright\arraybackslash}p{0.2\textwidth}}
+\toprule
+Variant & Sparsity mechanism & Strength & Main concern \\
+\midrule
+Vanilla SAE & $L_1$ on activations & Simple and standard & Shrinkage bias \\
+TopK SAE & Hard top-$K$ per token & Direct control, cleaner sparsity & Choosing good $K$ \\
+FC\_SAE & Token allocation per feature & Better feature usage & Assignment complexity \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+
+\begin{frame}{Common Failure Cases}
+\begin{itemize}
+  \item Dead features: never selected under current data and hyperparameters
+  \item Split concepts: one concept fragmented across many weak features
+  \item Polysemantic leftovers: one feature still mixes unrelated contexts
+  \item Dataset bias: labels may reflect corpus skew
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Training Health Check}
+\slideimg{SAE_metrics.png}
+\begin{itemize}
+  \item Structural: sparsity level, dead-feature ratio, activation spread
+  \item Functional: reconstruction fidelity and steering utility
+  \item Choose checkpoints using both views, not loss alone
+\end{itemize}
+\end{frame}
+
 
 \begin{frame}{Tuning Parameters (Practical)}
 \textbf{Core knobs}
@@ -220,7 +271,7 @@ L(z) = \|z - \hat{z}\|_2^2 + \alpha \|h(z)\|_1
 \begin{frame}{From Survey Taxonomy to Practice}
 The survey groups SAE evolution into two broad directions:
 \begin{itemize}
-  \item \textbf{Architecture improvements}: Gated, TopK, Batch TopK, JumpReLU, Switch-style routing
+  \item \textbf{Architecture improvements}: Gated, TopK, JumpReLU, Feature Choice, etc.
   \item \textbf{Training/evaluation improvements}: better sparsity control, dead-feature mitigation, stronger diagnostics
 \end{itemize}
 
@@ -274,50 +325,53 @@ Survey statement (Ayonrinde, 2024):
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Architectures at a Glance}
-\slideimg{types_of_sae.png}
-\begin{itemize}
-  \item Vanilla SAE: simple baseline with soft sparsity penalties
-  \item TopK/Batch-TopK: explicit activation budget per token/batch
-  \item FC-style assignment: balances utilization pressure across features
-\end{itemize}
-\end{frame}
-
 \begin{frame}{Architectural Shift: Why Move Beyond Vanilla SAE?}
-Reported issues in standard SAE variants:
-\begin{itemize}
-  \item Shrinkage bias from $L_1$ penalties
-  \item Dead latents (features that never activate)
-  \item Rigid sparsity allocation
-\end{itemize}
-
-New architectures aim to keep:
-\begin{itemize}
-  \item strong reconstruction
-  \item sparse features
-  \item healthier feature utilization
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Architectural Comparison (Quick)}
-\small
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.2\textwidth} >{\raggedright\arraybackslash}p{0.3\textwidth} >{\raggedright\arraybackslash}p{0.22\textwidth} >{\raggedright\arraybackslash}p{0.2\textwidth}}
+\scriptsize
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.28\textwidth} >{\centering\arraybackslash}p{0.21\textwidth} >{\centering\arraybackslash}p{0.21\textwidth}}
 \toprule
-Variant & Sparsity mechanism & Strength & Main concern \\
+\textbf{Metric} & \textbf{Vanilla SAE} & \textbf{FC\_SAE} \\
 \midrule
-Vanilla SAE & $L_1$ on activations & Simple and standard & Shrinkage bias \\
-TopK SAE & Hard top-$K$ per token & Direct control, cleaner sparsity & Choosing good $K$ \\
-FC\_SAE & Token allocation per feature & Better feature usage & Assignment complexity \\
+MSE (reconstruction) & 0.1264 & 0.1597 \\
+Cosine similarity & 0.9368 & 0.9213 \\
+Explained variance & 0.8736 & 0.8421 \\
+Feature density & 1.20\% & 3.48\% \\
+Dead features & 4716 (38.38\%) & 13 (0.21\%) \\
+Validation loss & -- & 0.2339 \\
 \bottomrule
 \end{tabular}
+
+\vspace{0.4em}
+\footnotesize
+\textbf{Why we moved to FC\_SAE (per survey motivation):}
+\begin{itemize}
+  \item Vanilla SAE gives stronger raw reconstruction, but suffers severe dead-feature collapse (38.38\%).
+  \item FC\_SAE greatly improves feature utilization by enforcing allocation pressure across features (rather than only per-token sparsity).
+  \item This supports more reliable interpretability: more features participate, fewer latents are wasted, and coverage is broader across token contexts.
+  \item We accept a modest reconstruction trade-off to gain a much healthier and more usable feature dictionary for analysis.
+\end{itemize}
 \end{frame}
 
-\begin{frame}{Training Health Check}
-\slideimg{SAE_metrics.png}
+\begin{frame}{Dataset Ablation: Vanilla SAE}
+\scriptsize
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.30\textwidth} >{\centering\arraybackslash}p{0.27\textwidth} >{\centering\arraybackslash}p{0.27\textwidth}}
+\toprule
+\textbf{Metric} & \textbf{peoples\_speech} & \textbf{openwebtext} \\
+\midrule
+Mean feature activation & 0.006734 & 0.006608 \\
+Max feature activation & 34.968746 & 37.037125 \\
+Feature density & 1.20\% & 1.26\% \\
+Dead features & 4716 & 10177 \\
+Dead feature fraction & 38.38\% & 55.21\% \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.5em}
+\footnotesize
+\textbf{Concise interpretation:}
 \begin{itemize}
-  \item Structural: sparsity level, dead-feature ratio, activation spread
-  \item Functional: reconstruction fidelity and steering utility
-  \item Choose checkpoints using both views, not loss alone
+  \item openwebtext shows much higher dead-feature collapse than peoples\_speech (55.21\% vs 38.38\%).
+  \item A likely reason is dataset composition: openwebtext is dominated by news/political style text, so feature usage is less diverse.
+  \item peoples\_speech has broader spoken-language variability, activating a wider portion of the dictionary.
 \end{itemize}
 \end{frame}
 
@@ -331,13 +385,13 @@ FC\_SAE & Token allocation per feature & Better feature usage & Assignment compl
 \end{frame}
 
 \begin{frame}{Results: Reconstruction/Interpretability Balance}
-\slideimg{SAE_architecture2.png}
 \begin{itemize}
   \item Too little sparsity: strong reconstruction, weaker disentanglement
   \item Too much sparsity: cleaner features, higher information loss
   \item Practical target: lowest error with stable semantic features
 \end{itemize}
 \end{frame}
+
 
 \begin{frame}{Interpretation Protocol (Survey + Ng Notes)}
 \begin{itemize}
@@ -351,14 +405,7 @@ Interpretable hidden units correspond to sparse non-linear features of input spa
 \end{block}
 \end{frame}
 
-\begin{frame}{Common Failure Cases}
-\begin{itemize}
-  \item Dead features: never selected under current data and hyperparameters
-  \item Split concepts: one concept fragmented across many weak features
-  \item Polysemantic leftovers: one feature still mixes unrelated contexts
-  \item Dataset bias: labels may reflect corpus skew
-\end{itemize}
-\end{frame}
+
 
 \begin{frame}{Inference UI Overview}
 The inference UI (by ANTLR) has \textbf{three main tabs}:
