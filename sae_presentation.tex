@@ -1,10 +1,12 @@
-\documentclass[aspectratio=169]{beamer}
+\documentclass[aspectratio=169,12pt]{beamer}
 
 \usetheme{metropolis}
 \setbeamertemplate{navigation symbols}{}
 
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
+\usepackage[scaled=0.95]{helvet}
+\renewcommand{\familydefault}{\sfdefault}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
@@ -12,8 +14,8 @@
 \graphicspath{{images/}}
 
 \title{Sparse Autoencoders (SAE) for LLM Interpretability}
-\subtitle{From superposition to monosemantic features \\ ML 330 Project}
-\author{ANTLR - Nafis Nahian, Arnob Biswas, Tanvir Liaquat Uday}
+\subtitle{From superposition to monosemantic features}
+\author{TEAM ANTLR - Nafis Nahian, Arnob Biswas, Tanvir Liaquat Uday}
 \date{}
 
 \newcommand{\slideimg}[1]{%
@@ -24,7 +26,7 @@
 
 \newcommand{\uiimg}[1]{%
   \begin{center}
-    \includegraphics[width=0.9\textwidth,height=0.46\textheight,keepaspectratio]{#1}
+    \includegraphics[width=0.95\textwidth,height=0.65\textheight]{#1}
   \end{center}
 }
 
@@ -67,13 +69,13 @@
 \textbf{Geometric view}
 \begin{itemize}
   \item Latent space has dimension $d$
-  \item Model needs to represent $m$ concepts with $m \gg d$
+  \item Model needs to represent $c$ concepts with $c \gg d$
   \item Concepts are packed as overlapping linear combinations
 \end{itemize}
 
 Observed activation vector:
 \[
-z \approx \sum_{i=1}^{m} a_i f_i
+z \approx \sum_{i=1}^{c} a_i f_i
 \]
 \begin{itemize}
   \item $f_i$: feature directions
@@ -120,26 +122,6 @@ z \rightarrow h(z) \rightarrow \hat{z}
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Sparse Representation Principle}
-Given encoder output $h(z)$:
-\begin{itemize}
-  \item Most entries in $h(z)$ should be 0 (or near 0)
-  \item Only informative features should activate
-\end{itemize}
-
-This pushes the model away from:
-\begin{itemize}
-  \item ``everything somewhat active''
-\end{itemize}
-
-Toward:
-\begin{itemize}
-  \item ``few meaningful features strongly active''
-\end{itemize}
-
-Result: cleaner feature-to-concept mapping.
-\end{frame}
-
 \begin{frame}{SAE Intro: Architecture}
 \begin{columns}[T,onlytextwidth]
 \column{0.45\textwidth}
@@ -161,14 +143,32 @@ Typical form:
 
 \column{0.53\textwidth}
 \begin{center}
-\includegraphics[width=0.94\linewidth,height=0.72\textheight,keepaspectratio]{SAE_vs_LLM_comparison.png}
+\includegraphics[width=0.94\linewidth,height=0.72\textheight,keepaspectratio]{SAE_architecture.png}
+\end{center}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Sparse Representation Principle}
+\begin{columns}[T,onlytextwidth]
+\column{0.52\textwidth}
+Given encoder output $h(z)$:
+\begin{itemize}
+  \item Most entries in $h(z)$ should be 0 (or near 0)
+  \item Only informative features should activate
+  \item This pushes the model away from "everything somewhat active"
+  \item Toward "few meaningful features strongly active"
+\end{itemize}
+
+Result: cleaner feature-to-concept mapping.
+
+\column{0.46\textwidth}
+\begin{center}
+\includegraphics[width=\linewidth,height=0.66\textheight]{SAE_vs_LLM_comparison.png}
 \end{center}
 \end{columns}
 \end{frame}
 
 \begin{frame}{SAE Loss (L1-Regularized Form)}
-\begin{columns}[T,onlytextwidth]
-\column{0.55\textwidth}
 From the survey's standard objective:
 \[
 L(z) = \|z - \hat{z}\|_2^2 + \alpha \|h(z)\|_1
@@ -185,12 +185,6 @@ L(z) = \|z - \hat{z}\|_2^2 + \alpha \|h(z)\|_1
   \item High $\alpha$: more sparse, weaker reconstruction
   \item Low $\alpha$: better reconstruction, less disentanglement
 \end{itemize}
-
-\column{0.45\textwidth}
-\begin{center}
-\includegraphics[width=\linewidth,height=0.74\textheight,keepaspectratio]{SAE_architecture.png}
-\end{center}
-\end{columns}
 \end{frame}
 
 \begin{frame}{Research Setting}
@@ -201,8 +195,10 @@ L(z) = \|z - \hat{z}\|_2^2 + \alpha \|h(z)\|_1
 \textbf{Architecture} & \textbf{Dataset} & \textbf{GPT-2 Layer} \\
 \midrule
 Vanilla SAE & BookCorpus & Layer 8 \\
+\hline
 TopK SAE & Openwebtext &  Layer 9 \\
-Feature Choice SAE & MLCommons/peoples\_speech & Layer 10 \\
+\hline
+Feature Choice SAE & peoples\_speech & Layer 10 \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -259,7 +255,7 @@ FC\_SAE & Token allocation per feature & Better feature usage & Assignment compl
 \end{enumerate}
 \end{frame}
 
-\begin{frame}{From Survey Taxonomy to Practice}
+\begin{frame}{Evolution of SAE in Practice}
 The survey groups SAE evolution into two broad directions:
 \begin{itemize}
   \item \textbf{Architecture improvements}: Gated, TopK, JumpReLU, Feature Choice, etc.
@@ -267,44 +263,41 @@ The survey groups SAE evolution into two broad directions:
 \end{itemize}
 
 \begin{block}{Practical takeaway}
+\vspace{2pt}
 Do not optimize only reconstruction loss; monitor sparsity quality and feature utilization jointly.
 \end{block}
 \end{frame}
 
-\begin{frame}{TopK SAE and Batch TopK Intuition}
-TopK SAE enforces sparsity by selection, not by $L_1$ penalty.
+% \begin{frame}{TopK SAE Intuition}
+% TopK SAE enforces sparsity by selection, not by $L_1$ penalty.
 
-Encoder idea:
-\[
-\tilde{h}(z) = TopK\big(W_{enc}(z - b_{pre})\big)
-\]
+% Encoder idea:
+% \[
+% \tilde{h}(z) = TopK\big(W_{enc}(z - b_{pre})\big)
+% \]
 
-Training objective (survey form):
-\[
-L(z) = \|z - \hat{z}\|_2^2 + \alpha L_{aux}
-\]
+% Training objective (survey form):
+% \[
+% L(z) = \|z - \hat{z}\|_2^2 + \alpha L_{aux}
+% \]
 
-\begin{itemize}
-  \item Keep only top-$K$ activations per token
-  \item Avoid direct magnitude shrinkage from L1
-  \item Batch TopK stabilizes activation budget across a batch
-\end{itemize}
-\end{frame}
+% \begin{itemize}
+%   \item Keep only top-$K$ activations per token
+%   \item Avoid direct magnitude shrinkage from L1
+%   \item Batch TopK stabilizes activation budget across a batch
+% \end{itemize}
+% \end{frame}
 
 \begin{frame}{FC\_SAE (Feature Choice SAE)}
 Feature Choice SAE changes sparsity allocation direction.
 
-Instead of:
+
 \begin{itemize}
-  \item fixed active features per token
+  \item Instead of fixed active features per token
+  \item It enforces each feature gets assigned to a controlled number of tokens
 \end{itemize}
 
-It enforces:
-\begin{itemize}
-  \item each feature gets assigned to a controlled number of tokens
-\end{itemize}
-
-Survey statement (Ayonrinde, 2024):
+(Ayonrinde, 2024):
 \[
 \sum_j S_{i,j} = m,\ \forall i
 \]
@@ -317,8 +310,9 @@ Survey statement (Ayonrinde, 2024):
 \end{frame}
 
 \begin{frame}{Dataset Ablation: Vanilla SAE}
-\scriptsize
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.30\textwidth} >{\centering\arraybackslash}p{0.27\textwidth} >{\centering\arraybackslash}p{0.27\textwidth}}
+\begin{center}
+{\scriptsize
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.28\textwidth} >{\centering\arraybackslash}p{0.29\textwidth} >{\centering\arraybackslash}p{0.29\textwidth}}
 \toprule
 \textbf{Metric} & \textbf{peoples\_speech} & \textbf{openwebtext} \\
 \midrule
@@ -327,9 +321,11 @@ Dead features & 4716 & 10177 \\
 Dead feature fraction & 38.38\% & 55.21\% \\
 \bottomrule
 \end{tabular}
+}
+\end{center}
 
-\vspace{0.5em}
-\footnotesize
+\vspace{0.3em}
+\normalsize
 \textbf{Interpretation:}
 \begin{itemize}
   \item openwebtext shows much higher dead-feature collapse than peoples\_speech (55.21\% vs 38.38\%).
@@ -339,8 +335,9 @@ Dead feature fraction & 38.38\% & 55.21\% \\
 \end{frame}
 
 \begin{frame}{Architectural Shift: Why Move Beyond Vanilla SAE?}
-\scriptsize
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.28\textwidth} >{\centering\arraybackslash}p{0.21\textwidth} >{\centering\arraybackslash}p{0.21\textwidth}}
+\begin{center}
+{\scriptsize
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.30\textwidth} >{\centering\arraybackslash}p{0.24\textwidth} >{\centering\arraybackslash}p{0.24\textwidth}}
 \toprule
 \textbf{Metric} & \textbf{Vanilla SAE} & \textbf{FC\_SAE} \\
 \midrule
@@ -352,15 +349,16 @@ Dead features & 4716 (38.38\%) & 13 (0.21\%) \\
 Validation loss & 0.2575 & 0.2339 \\
 \bottomrule
 \end{tabular}
+}
+\end{center}
 
-\vspace{0.4em}
-\footnotesize
-\textbf{Why we moved to FC\_SAE (per survey motivation):}
+\vspace{0.25em}
+\normalsize
+\textbf{Why we moved to FC\_SAE :}
 \begin{itemize}
-  \item Vanilla SAE gives stronger raw reconstruction, but suffers severe dead-feature collapse (38.38\%).
-  \item FC\_SAE greatly improves feature utilization by enforcing allocation pressure across features (rather than only per-token sparsity).
-  \item This supports more reliable interpretability: more features participate, fewer latents are wasted, and coverage is broader across token contexts.
-  \item We accept a modest reconstruction trade-off to gain a much healthier and more usable feature dictionary for analysis.
+  \item Vanilla SAE has better reconstruction, but severe dead-feature collapse.
+  \item FC\_SAE enforces feature-level allocation, sharply improving utilization.
+  \item We trade a little reconstruction for a far healthier dictionary for interpretability.
 \end{itemize}
 \end{frame}
 
@@ -389,7 +387,8 @@ Validation loss & 0.2575 & 0.2339 \\
   \item Validate with counterexamples and cross-context checks
   \item Flag brittle/polysemantic features for retuning
 \end{itemize}
-\begin{block}{Ng-style intuition}
+\begin{block}{Intuition}
+\vspace{2pt}
 Interpretable hidden units correspond to sparse non-linear features of input space.
 \end{block}
 \end{frame}
@@ -397,7 +396,7 @@ Interpretable hidden units correspond to sparse non-linear features of input spa
 
 
 \begin{frame}{Inference UI Overview}
-The inference UI (by ANTLR) has \textbf{three main tabs}:
+The inference UI has \textbf{three main tabs}:
 
 \vspace{0.3em}
 \begin{tabular}{>{\raggedright\arraybackslash}p{0.24\textwidth} >{\raggedright\arraybackslash}p{0.68\textwidth}}
