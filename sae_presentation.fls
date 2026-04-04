@@ -434,10 +434,6 @@ INPUT ./images/SAE_workflow.png
 INPUT ./images/SAE_workflow.png
 INPUT ./images/SAE_workflow.png
 INPUT ./images/SAE_workflow.png
-INPUT ./images/SAE_metrics.png
-INPUT ./images/SAE_metrics.png
-INPUT ./images/SAE_metrics.png
-INPUT ./images/SAE_metrics.png
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/jknappen/ec/ecsx0800.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/jknappen/ec/ecss0900.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/jknappen/ec/ecsx0900.tfm

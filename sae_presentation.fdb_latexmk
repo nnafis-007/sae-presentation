@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1775266245.84098 "/home/nn/buet-classes/330-ML-lab/slide (2)/sae_presentation.tex" "sae_presentation.pdf" "sae_presentation" 1775266251.47936 0
+["pdflatex"] 1775266805.33645 "/home/nn/buet-classes/330-ML-lab/slide (2)/sae_presentation.tex" "sae_presentation.pdf" "sae_presentation" 1775266810.2194 0
   "/etc/texmf/web2c/texmf.cnf" 1775249455.86135 475 c0e671620eb5563b2130f56340a5fde8 ""
   "/home/nn/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/ecsi0800.600pk" 1775250112.51116 19376 ee10b498cfc8c561ab2e137a30ad386a ""
   "/home/nn/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/ecsi0900.600pk" 1775250794.23131 22060 efe6eef555c2196f10798b7af9c48ccf ""
@@ -21,7 +21,7 @@
   "/home/nn/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1095.600pk" 1775250109.22077 21952 2036217c4f68902d72506190022a257a ""
   "/home/nn/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcss0900.600pk" 1775250795.39331 9524 238dde1a17a216a1ae93f1b46a4ee05e ""
   "/home/nn/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcss1095.600pk" 1775250199.82825 11620 9d113e862b9484f4e9aa2eeb472917ce ""
-  "/home/nn/buet-classes/330-ML-lab/slide (2)/sae_presentation.tex" 1775266239.6444 15354 63387891c136ff842aaffec5406613b4 ""
+  "/home/nn/buet-classes/330-ML-lab/slide (2)/sae_presentation.tex" 1775266804.99173 15008 d58d11ecf035552b0704d6a6cefc370c ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/jknappen/ec/ecsi0500.tfm" 1136768653 3584 cddc42a948742f3f690b828feeaf2449 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/jknappen/ec/ecsi0600.tfm" 1136768653 3584 812f7e2de5681b983f3aeaadd29c79b6 ""
@@ -257,7 +257,6 @@
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1775249470.2241 128028 f533b797fba58d231669ea19e894e23e ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1775249485 6800794 1e431f9d3a0d696faa0742eddfd6443e ""
   "images/SAE_architecture.png" 1775242803 328374 5cc6200e5425ca73c215e69260e27adf ""
-  "images/SAE_metrics.png" 1775243426 664293 f19602e0a4174d73ad01f99a80b49ca3 ""
   "images/SAE_vs_LLM_comparison.png" 1775242976 558937 a287c2a0da8d0c73f8982eca7673bc0b ""
   "images/SAE_workflow.png" 1775263836.85813 395339 21e8ea74a16d3f78df3ca034f9dd473e ""
   "images/Usual_LLM_superposition.png" 1775242695 629981 bd8a7c9b3bf8fb7f920404699ed60a61 ""
@@ -267,10 +266,10 @@
   "images/ui_feature_trace.jpg" 1775239752 70208 f447ad77ba9e8e2588785d668cac52d7 ""
   "images/ui_sae_analysis.jpg" 1775239738 60664 289280cd46eef1d593c44da892990a0f ""
   "images/ui_token_view.jpg" 1775239728 82523 204f830664f82fc92a38cf72bbcd16d6 ""
-  "sae_presentation.aux" 1775266251.34448 4689 057958012e5d1b5fb728a220cd359246 "pdflatex"
-  "sae_presentation.nav" 1775266251.34569 3248 04f88683e470406fc21eb9e1acb56761 "pdflatex"
-  "sae_presentation.out" 1775266246.6696 0 d41d8cd98f00b204e9800998ecf8427e "pdflatex"
-  "sae_presentation.tex" 1775266239.6444 15354 63387891c136ff842aaffec5406613b4 ""
+  "sae_presentation.aux" 1775266810.08619 4560 cc7d010e169dd9285b351e9fdc068ef5 "pdflatex"
+  "sae_presentation.nav" 1775266810.08753 3155 b379335c0c1e73cb5bf3ba258b1317d0 "pdflatex"
+  "sae_presentation.out" 1775266806.17254 0 d41d8cd98f00b204e9800998ecf8427e "pdflatex"
+  "sae_presentation.tex" 1775266804.99173 15008 d58d11ecf035552b0704d6a6cefc370c ""
   (generated)
   "sae_presentation.aux"
   "sae_presentation.log"

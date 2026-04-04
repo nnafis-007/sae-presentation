@@ -12,8 +12,8 @@
 \graphicspath{{images/}}
 
 \title{Sparse Autoencoders (SAE) for LLM Interpretability}
-\subtitle{From superposition to monosemantic features}
-\author{330 ML Lab}
+\subtitle{From superposition to monosemantic features \\ ML 330 Project}
+\author{ANTLR - Nafis Nahian, Arnob Biswas, Tanvir Liaquat Uday}
 \date{}
 
 \newcommand{\slideimg}[1]{%
@@ -240,15 +240,6 @@ FC\_SAE & Token allocation per feature & Better feature usage & Assignment compl
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Training Health Check}
-\slideimg{SAE_metrics.png}
-\begin{itemize}
-  \item Structural: sparsity level, dead-feature ratio, activation spread
-  \item Functional: reconstruction fidelity and steering utility
-  \item Choose checkpoints using both views, not loss alone
-\end{itemize}
-\end{frame}
-
 
 \begin{frame}{Tuning Parameters (Practical)}
 \textbf{Core knobs}
@@ -325,6 +316,28 @@ Survey statement (Ayonrinde, 2024):
 \end{itemize}
 \end{frame}
 
+\begin{frame}{Dataset Ablation: Vanilla SAE}
+\scriptsize
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.30\textwidth} >{\centering\arraybackslash}p{0.27\textwidth} >{\centering\arraybackslash}p{0.27\textwidth}}
+\toprule
+\textbf{Metric} & \textbf{peoples\_speech} & \textbf{openwebtext} \\
+\midrule
+Feature density & 1.20\% & 1.26\% \\
+Dead features & 4716 & 10177 \\
+Dead feature fraction & 38.38\% & 55.21\% \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.5em}
+\footnotesize
+\textbf{Interpretation:}
+\begin{itemize}
+  \item openwebtext shows much higher dead-feature collapse than peoples\_speech (55.21\% vs 38.38\%).
+  \item A likely reason is dataset composition: openwebtext is dominated by news/political style text, so feature usage is less diverse.
+  \item peoples\_speech has broader spoken-language variability, activating a wider portion of the dictionary.
+\end{itemize}
+\end{frame}
+
 \begin{frame}{Architectural Shift: Why Move Beyond Vanilla SAE?}
 \scriptsize
 \begin{tabular}{>{\raggedright\arraybackslash}p{0.28\textwidth} >{\centering\arraybackslash}p{0.21\textwidth} >{\centering\arraybackslash}p{0.21\textwidth}}
@@ -336,7 +349,7 @@ Cosine similarity & 0.9368 & 0.9213 \\
 Explained variance & 0.8736 & 0.8421 \\
 Feature density & 1.20\% & 3.48\% \\
 Dead features & 4716 (38.38\%) & 13 (0.21\%) \\
-Validation loss & -- & 0.2339 \\
+Validation loss & 0.2575 & 0.2339 \\
 \bottomrule
 \end{tabular}
 
@@ -348,30 +361,6 @@ Validation loss & -- & 0.2339 \\
   \item FC\_SAE greatly improves feature utilization by enforcing allocation pressure across features (rather than only per-token sparsity).
   \item This supports more reliable interpretability: more features participate, fewer latents are wasted, and coverage is broader across token contexts.
   \item We accept a modest reconstruction trade-off to gain a much healthier and more usable feature dictionary for analysis.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Dataset Ablation: Vanilla SAE}
-\scriptsize
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.30\textwidth} >{\centering\arraybackslash}p{0.27\textwidth} >{\centering\arraybackslash}p{0.27\textwidth}}
-\toprule
-\textbf{Metric} & \textbf{peoples\_speech} & \textbf{openwebtext} \\
-\midrule
-Mean feature activation & 0.006734 & 0.006608 \\
-Max feature activation & 34.968746 & 37.037125 \\
-Feature density & 1.20\% & 1.26\% \\
-Dead features & 4716 & 10177 \\
-Dead feature fraction & 38.38\% & 55.21\% \\
-\bottomrule
-\end{tabular}
-
-\vspace{0.5em}
-\footnotesize
-\textbf{Concise interpretation:}
-\begin{itemize}
-  \item openwebtext shows much higher dead-feature collapse than peoples\_speech (55.21\% vs 38.38\%).
-  \item A likely reason is dataset composition: openwebtext is dominated by news/political style text, so feature usage is less diverse.
-  \item peoples\_speech has broader spoken-language variability, activating a wider portion of the dictionary.
 \end{itemize}
 \end{frame}
 
